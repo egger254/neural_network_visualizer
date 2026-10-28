@@ -14,9 +14,9 @@
     --green: #7ab84f;
     --ok: #2e9d4a;
     --bad: #d63031;
-    --stone-green: #6cae45;
-    --stone-red: #ee1c1c;
-    --stone-edge: #13283f;
+    --stone-green: #70ad47;
+    --stone-red: #ff0000;
+    --stone-edge: #00162a;
     --bg: #f4f6f9;
     --card: #ffffff;
     --text: #1d2733;
@@ -91,27 +91,18 @@
 
   /* --- Netz-SVG --- */
   #net { width: 100%; height: auto; display: block; }
-  #net .link { stroke: #0f3c64; stroke-width: 1.5; transition: stroke-width .2s, stroke .2s; }
-  #net .link.active { stroke-width: 3; }
-  #net .link.changed { stroke: var(--orange); stroke-width: 3.5; }
+  #net .link { stroke: #0f3c64; stroke-width: 0.75; transition: stroke-width .2s, stroke .2s; }
+  #net .link.active { stroke-width: 1.5; }
+  #net .link.changed { stroke: var(--orange); stroke-width: 1.75; }
   #net .node-text { font-family: 'Courier New', monospace; font-weight: bold; font-size: 18px; text-anchor: middle; fill: #000; }
   #net .title-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 22px; text-anchor: middle; }
   #net .class-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 18px; fill: #000; }
   #net .class-text.predicted { fill: var(--blue); text-decoration: underline; }
-  #net .conf-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); }
   #net .placeholder { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); text-anchor: middle; }
   #net .img-label { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 15px; text-anchor: middle; fill: var(--text); }
-  #net .stone { stroke: var(--stone-edge); stroke-width: 1.6; stroke-linejoin: round; }
-
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 6px;
-  }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #net .stone { stroke: var(--stone-edge); stroke-width: 1; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
+  #net .bar-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--text); }
+  #net .bar-pct { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--muted); text-anchor: end; font-variant-numeric: tabular-nums; }
 
   /* --- Statusliste --- */
   .status-list {
@@ -266,6 +257,8 @@
           <image id="imgEl" x="-170" y="170" width="120" height="120" preserveAspectRatio="xMidYMid slice" clip-path="url(#imgClip)" />
           <rect x="-170" y="170" width="120" height="120" rx="10" fill="none" stroke="#f3922c" stroke-width="3" />
           <text x="-110" y="318" class="img-label" id="imgLabel"></text>
+          <!-- Wahrscheinlichkeitsbalken (je Label eine Zeile) -->
+          <g id="probBars"></g>
         </g>
         <g id="badge" opacity="0">
           <circle cx="-54" cy="174" r="18" id="badgeCircle" />
@@ -285,17 +278,10 @@
         </g>
         <g class="classes">
           <text x="750" y="181" class="class-text" id="classText0"></text>
-          <text x="750" y="203" class="conf-text" id="confText0"></text>
           <text x="750" y="291" class="class-text" id="classText1"></text>
-          <text x="750" y="313" class="conf-text" id="confText1"></text>
         </g>
       </svg>
 
-      <div class="legend">
-        <span><svg width="18" height="18" viewBox="-9 -9 18 18"><path class="stone-icon" data-sign="1" /></svg> positives Gewicht (verstärkt)</span>
-        <span><svg width="18" height="18" viewBox="-9 -9 18 18"><path class="stone-icon" data-sign="-1" /></svg> negatives Gewicht (hemmt)</span>
-        <span>Anzahl der Steine = Stärke des Gewichts</span>
-      </div>
     </section>
 
     <section class="card">
@@ -402,16 +388,16 @@ const IMAGE_ANCHOR = { x: -50, y: 230 };
 
 // Steine (Gewichte)
 const STONE = {
-  max: 4,          // max. Steine pro Verbindung
-  startOffset: 56, // Abstand des ersten Steins vom Startknoten
-  spacing: 16,     // Abstand zwischen Steinen
-  colors: { 1: '#6cae45', '-1': '#ee1c1c' },
-  // Formen nach den Vorlagen (grün: Tropfen, rot: abgerundetes Viereck)
-  shapes: {
-    1: 'M-6.5,-6.8 C-3,-8.6 3.5,-8.4 6.6,-6 C8.2,-2.6 7.6,2.6 6.8,7.6 C3.6,6.4 0.4,6.2 -2.8,7.2 C-6.8,7.6 -8.4,3.4 -8.2,-0.6 C-8.2,-3.6 -8.4,-5.8 -6.5,-6.8 Z',
-    '-1': 'M-5.4,-8.2 C-1.2,-9 4,-8.2 6,-6.4 C7.6,-2.6 8.4,2.6 7.2,7.2 C3,8.4 -2,8.2 -6.2,7 C-7.6,2.8 -8.4,-2.2 -7.4,-6 C-7,-7.4 -6.4,-8 -5.4,-8.2 Z',
-  },
+  max: 3,          // max. Steine pro Verbindung (bei 4 kollidieren Steine an den Linienkreuzungen)
+  startOffset: 54, // Abstand des ersten Steins vom Startknoten (Mittelpunkt)
+  spacing: 22,     // Abstand zwischen den Stein-Mittelpunkten (16 px Stein + Lücke)
+  colors: { 1: '#70ad47', '-1': '#ff0000' },
+  // Form aus stone_green.svg, auf 16 px Breite skaliert und zentriert
+  shape: 'M-6.53,-0.28 C-5.47,-1.15 -5.49,-6.94 -0.02,-6.99 0.60,-6.99 1.11,-6.49 1.67,-6.23 2.11,-5.70 2.63,-5.23 2.98,-4.64 3.90,-3.14 4.43,-1.41 5.47,0.01 5.94,0.64 6.75,0.92 7.39,1.37 7.50,2.26 8.09,3.23 7.72,4.05 7.36,4.87 6.24,5.06 5.52,5.60 4.97,6.01 4.46,6.47 3.93,6.91 3.08,6.53 2.20,6.23 1.39,5.78 -0.92,4.49 0.10,4.41 -2.22,3.67 -2.96,3.43 -3.75,3.32 -4.51,3.15 -4.95,2.62 -5.32,2.02 -5.83,1.55 -7.84,-0.29 -8.75,0.86 -6.39,-1.73 -6.24,-1.89 -7.59,0.60 -6.53,-0.28Z',
 };
+
+// Wahrscheinlichkeitsbalken unter dem Trainingsbild
+const BARS = { x: -185, width: 150, y: [342, 374], height: 9 };
 
 const PHASES = [
   { key: 'present',  label: 'Bild anlegen' },
@@ -424,7 +410,7 @@ const PHASES = [
 // Basisdauern in ms bei Geschwindigkeit 1×
 const DURATION = {
   imageIn: 300, linksIn: 450,
-  signal: 650, activate: 250,
+  signal: 650, activate: 250, bars: 500,
   predict: 600,
   evaluate: 700,
   imageOut: 300, stonesOut: 650, stonesIn: 800, updateHold: 500,
@@ -567,6 +553,7 @@ const linkEls = {};     // linkId -> <line>
 const nodeEls = {};     // nodeId -> { overlay, ring }
 const stoneSlots = {};  // linkId -> [{ inner, path }]
 const inputLines = [];  // Linien Bild -> Input-Knoten
+const probBars = [];    // { name, value, fill } je Label
 
 function buildNetwork() {
   const linksG = $('links'), nodesG = $('nodes'), stonesG = $('stones'), inputG = $('inputLinks');
@@ -584,13 +571,11 @@ function buildNetwork() {
     stoneSlots[l.id] = [];
     for (let i = 0; i < STONE.max; i++) {
       const d = STONE.startOffset + i * STONE.spacing;
-      const off = (i % 2 ? 1.5 : -1.5);            // leichter Zickzack wie im Vorbild
-      const x = a.x + ux * d - uy * off;
-      const y = a.y + uy * d + ux * off;
-      const rot = angle + [-12, 9, -4, 14][i];
-      const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})` });
+      const x = a.x + ux * d;
+      const y = a.y + uy * d;
+      const g = svgEl('g', { transform: `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)})` });
       const inner = svgEl('g');
-      const path = svgEl('path', { class: 'stone' });
+      const path = svgEl('path', { class: 'stone', d: STONE.shape });
       inner.append(path);
       g.append(inner);
       stonesG.append(g);
@@ -614,26 +599,36 @@ function buildNetwork() {
     const len = Math.hypot(n.x - IMAGE_ANCHOR.x, n.y - IMAGE_ANCHOR.y);
     const line = svgEl('line', {
       x1: IMAGE_ANCHOR.x, y1: IMAGE_ANCHOR.y, x2: n.x, y2: n.y,
-      stroke: '#f3922c', 'stroke-width': 2.5, 'stroke-dasharray': len, 'stroke-dashoffset': len,
+      stroke: '#f3922c', 'stroke-width': 1.25, 'stroke-dasharray': len, 'stroke-dashoffset': len,
     });
     line.len = len;
     inputG.append(line);
     inputLines.push(line);
   }
 
-  // Legenden-Icons
-  document.querySelectorAll('.stone-icon').forEach(p => {
-    const sign = p.dataset.sign;
-    p.setAttribute('d', STONE.shapes[sign]);
-    p.setAttribute('fill', STONE.colors[sign]);
-    p.setAttribute('class', 'stone');
-    p.setAttribute('stroke', '#13283f');
-    p.setAttribute('stroke-width', '1.6');
+  // Wahrscheinlichkeitsbalken: Name links, Prozent rechts, Balken darunter
+  const barsG = $('probBars');
+  probBars.length = 0;
+  BARS.y.forEach(y => {
+    const name = svgEl('text', { x: BARS.x, y: y - 4, class: 'bar-text' });
+    const value = svgEl('text', { x: BARS.x + BARS.width, y: y - 4, class: 'bar-pct' });
+    const track = svgEl('rect', { x: BARS.x, y, width: BARS.width, height: BARS.height, rx: 3, fill: '#e3e8ee' });
+    const fill = svgEl('rect', { x: BARS.x, y, width: 0, height: BARS.height, rx: 3, fill: '#9aa5b1' });
+    barsG.append(name, value, track, fill);
+    probBars.push({ name, value, fill });
+  });
+}
+
+function setBars(probs, highlight = null, color = '#0f3c64') {
+  probBars.forEach((b, i) => {
+    b.fill.setAttribute('width', (BARS.width * (probs ? probs[i] : 0)).toFixed(1));
+    b.value.textContent = probs ? pct(probs[i]) : '–';
+    b.fill.setAttribute('fill', i === highlight ? color : '#9aa5b1');
+    b.name.style.fontWeight = i === highlight ? 'bold' : '';
   });
 }
 
 function setStoneSign(slot, sign) {
-  slot.path.setAttribute('d', STONE.shapes[sign]);
   slot.path.setAttribute('fill', STONE.colors[sign]);
 }
 function setStoneVisual(slot, scale, opacity, dy = 0) {
@@ -704,7 +699,7 @@ async function animateSignals(stage, token) {
     const c = svgEl('circle', {
       r: 3 + count * 1.3,
       fill: count ? STONE.colors[sign] : '#9aa5b1',
-      stroke: '#13283f', 'stroke-width': 1,
+      stroke: '#00162a', 'stroke-width': 1,
     });
     $('pulses').append(c);
     linkEls[l.id].classList.add('active');
@@ -743,10 +738,8 @@ function resetTransient() {
   }
   inputLines.forEach(l => l.setAttribute('stroke-dashoffset', l.len));
   $('badge').setAttribute('opacity', 0);
-  [0, 1].forEach(i => {
-    $(`classText${i}`).classList.remove('predicted');
-    $(`confText${i}`).textContent = '';
-  });
+  [0, 1].forEach(i => $(`classText${i}`).classList.remove('predicted'));
+  setBars(null);
 }
 
 function hideImage() {
@@ -757,6 +750,7 @@ function hideImage() {
 function renderClassLabels() {
   $('classText0').textContent = labelName(0);
   $('classText1').textContent = labelName(1);
+  probBars.forEach((b, i) => { b.name.textContent = labelName(i); });
   if (current && state.status !== 'idle') $('imgLabel').textContent = `Label: ${labelName(state.inputs[current.k].label)}`;
 }
 
@@ -948,12 +942,13 @@ async function phaseForward(token) {
     LAYERS.hidden.forEach((id, i) => nodeEls[id].overlay.setAttribute('opacity', current.hidden[i] * 0.45 * t));
   }, token);
   await animateSignals(1, token);
-  await tween(DURATION.activate, t => {
-    LAYERS.output.forEach((id, i) => {
-      const act = i === current.pred ? current.conf : 1 - current.conf;
-      nodeEls[id].overlay.setAttribute('opacity', act * 0.6 * t);
-    });
+  const probs = LAYERS.output.map((_, i) => i === current.pred ? current.conf : 1 - current.conf);
+  await tween(DURATION.bars, t => {
+    const p = easeInOut(t);
+    LAYERS.output.forEach((id, i) => nodeEls[id].overlay.setAttribute('opacity', probs[i] * 0.6 * p));
+    setBars(probs.map(v => v * p));
   }, token);
+  setBars(probs);
 }
 
 async function phasePredict(token) {
@@ -962,9 +957,8 @@ async function phasePredict(token) {
   ring.setAttribute('stroke', '#0f3c64');
   ring.setAttribute('stroke-dasharray', '6 5');
   $(`classText${pred}`).classList.add('predicted');
-  $(`confText${pred}`).textContent = pct(conf);
-  $(`confText${1 - pred}`).textContent = pct(1 - conf);
-  setCaption(`Vorhersage: Das Netz hält das Bild für ${L(pred)} (${pct(conf)}).`);
+  setBars(pred === 0 ? [conf, 1 - conf] : [1 - conf, conf], pred);
+  setCaption('');
   await tween(DURATION.predict, t => ring.setAttribute('opacity', easeInOut(t)), token);
 }
 
@@ -980,6 +974,7 @@ async function phaseEvaluate(k, token) {
     truthRing.setAttribute('stroke-dasharray', '6 5');
   }
   setBadge(correct);
+  setBars(pred === 0 ? [current.conf, 1 - current.conf] : [1 - current.conf, current.conf], pred, correct ? 'var(--ok)' : 'var(--bad)');
   state.results[k] = { status: correct ? 'correct' : 'wrong', pred };
   renderStatusList();
   renderProgress();
