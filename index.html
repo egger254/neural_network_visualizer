@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuronales Netz – Trainingsvisualisierung</title>
+<style>
+  /* =====================================================================
+     Styles
+     ===================================================================== */
+  :root {
+    --orange: #f3922c;
+    --blue: #0f3c64;
+    --green: #7ab84f;
+    --ok: #2e9d4a;
+    --bad: #d63031;
+    --stone-green: #6cae45;
+    --stone-red: #ee1c1c;
+    --stone-edge: #13283f;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --text: #1d2733;
+    --muted: #6b7785;
+    --border: #dde3ea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 18px 16px 10px;
+  }
+  header h1 { margin: 0; font-size: 22px; color: var(--blue); }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 16px 24px;
+  }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+  }
+
+  /* --- Phasenleiste & Beschreibung --- */
+  .phase-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+  }
+  .phase-bar li {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    background: #edf1f5;
+    color: var(--muted);
+    transition: background .2s, color .2s;
+  }
+  .phase-bar li.current { background: var(--blue); color: #fff; }
+  .caption {
+    min-height: 2.8em;
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  .caption strong { color: var(--blue); }
+
+  /* --- Netz-SVG --- */
+  #net { width: 100%; height: auto; display: block; }
+  #net .link { stroke: #0f3c64; stroke-width: 1.5; transition: stroke-width .2s, stroke .2s; }
+  #net .link.active { stroke-width: 3; }
+  #net .link.changed { stroke: var(--orange); stroke-width: 3.5; }
+  #net .node-text { font-family: 'Courier New', monospace; font-weight: bold; font-size: 18px; text-anchor: middle; fill: #000; }
+  #net .title-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 22px; text-anchor: middle; }
+  #net .class-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 18px; fill: #000; }
+  #net .class-text.predicted { fill: var(--blue); text-decoration: underline; }
+  #net .conf-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); }
+  #net .placeholder { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); text-anchor: middle; }
+  #net .img-label { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 15px; text-anchor: middle; fill: var(--text); }
+  #net .stone { stroke: var(--stone-edge); stroke-width: 1.6; stroke-linejoin: round; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* --- Statusliste --- */
+  .status-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px 5px 5px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    transition: border-color .2s, background .2s;
+  }
+  .chip img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; display: block; }
+  .chip .chip-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .chip .chip-sub { color: var(--muted); font-size: 12px; }
+  .chip .chip-icon { font-weight: bold; font-size: 16px; min-width: 14px; text-align: center; }
+  .chip.active { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(243, 146, 44, .2); }
+  .chip.correct { border-color: var(--ok); background: #eef8f0; }
+  .chip.correct .chip-icon { color: var(--ok); }
+  .chip.wrong { border-color: var(--bad); background: #fdeeee; }
+  .chip.wrong .chip-icon { color: var(--bad); }
+  .empty-hint { color: var(--muted); font-size: 14px; }
+
+  /* --- Fortschritt --- */
+  .progress-head {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .segments { display: flex; gap: 3px; height: 16px; }
+  .seg { flex: 1; background: #e3e8ee; border-radius: 3px; overflow: hidden; }
+  .seg .fill { height: 100%; width: 0; background: var(--blue); transition: width .25s; }
+  .seg.done .fill { width: 100%; }
+  .accuracy { margin-top: 8px; font-size: 14px; color: var(--muted); }
+
+  /* --- Steuerung --- */
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    font: inherit;
+    font-size: 14px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #f0f3f6; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #164f82; }
+  .field { margin-top: 14px; }
+  .field > label, .field-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field-inline { display: flex; align-items: center; gap: 10px; }
+  input[type=range] { flex: 1; }
+  input[type=number], input[type=text], select {
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+  }
+  input[type=number] { width: 80px; }
+  .speed-value { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+  .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+  .segmented { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .segmented label { flex: 1; text-align: center; font-size: 13px; padding: 6px 4px; cursor: pointer; }
+  .segmented input { display: none; }
+  .segmented label:has(input:checked) { background: var(--blue); color: #fff; }
+  .segmented.dim { opacity: .5; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* --- Labels & Inputs --- */
+  .label-row { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .label-row span { font-family: 'Courier New', monospace; font-weight: bold; color: var(--green); }
+  .label-row input { width: 100%; }
+  .lock-note {
+    display: none;
+    font-size: 13px;
+    background: #fff6ea;
+    border: 1px solid #f6d3a8;
+    color: #8a5414;
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  body.locked .lock-note { display: block; }
+  .dropzone {
+    display: block;
+    border: 2px dashed var(--orange);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .dropzone.over { background: #fff3e6; }
+  .dropzone u { color: var(--orange); }
+  body.locked .dropzone { opacity: .45; cursor: not-allowed; }
+  .input-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .input-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; }
+  .input-item img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+  .input-item .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .input-item .name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .input-item select { width: 100%; padding: 3px 6px; }
+  .input-item .remove { padding: 4px 9px; }
+  .input-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .input-actions button { flex: 1; font-size: 13px; padding: 6px 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Wie ein neuronales Netz lernt</h1>
+  <p>Simulation: Das Netz klassifiziert die Trainingsbilder und verschiebt nach jeder Epoche seine Gewichte („Steine“).</p>
+</header>
+
+<div class="layout">
+  <!-- ===================== Hauptbereich ===================== -->
+  <main class="main">
+    <section class="card">
+      <ol class="phase-bar" id="phaseBar"></ol>
+      <div class="caption" id="caption"></div>
+
+      <svg id="net" xmlns="http://www.w3.org/2000/svg" viewBox="-190 0 1110 400" role="img" aria-label="Neuronales Netz">
+        <defs>
+          <clipPath id="imgClip"><rect x="-170" y="170" width="120" height="120" rx="10" /></clipPath>
+        </defs>
+
+        <!-- Bereich für das aktuelle Trainingsbild -->
+        <text x="-110" y="50" class="title-text" fill="#6b7785">Trainingsbild</text>
+        <rect x="-170" y="170" width="120" height="120" rx="10" fill="#fff" stroke="#f3922c" stroke-width="2" stroke-dasharray="6 5" />
+        <text x="-110" y="235" class="placeholder" id="imgPlaceholder">kein Bild</text>
+        <g id="inputLinks"></g>
+        <g id="imgGroup" opacity="0">
+          <image id="imgEl" x="-170" y="170" width="120" height="120" preserveAspectRatio="xMidYMid slice" clip-path="url(#imgClip)" />
+          <rect x="-170" y="170" width="120" height="120" rx="10" fill="none" stroke="#f3922c" stroke-width="3" />
+          <text x="-110" y="318" class="img-label" id="imgLabel"></text>
+        </g>
+        <g id="badge" opacity="0">
+          <circle cx="-54" cy="174" r="18" id="badgeCircle" />
+          <path id="badgeIcon" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+
+        <!-- Netz (wird per JS aus NODES/LINKS erzeugt) -->
+        <g id="links"></g>
+        <g id="stones"></g>
+        <g id="pulses"></g>
+        <g id="nodes"></g>
+
+        <g class="titles">
+          <text x="150" y="50" class="title-text" fill="#f3922c">Input Layer</text>
+          <text x="425" y="50" class="title-text" fill="#0f3c64">Hidden Layer</text>
+          <text x="700" y="50" class="title-text" fill="#7ab84f">Output Layer</text>
+        </g>
+        <g class="classes">
+          <text x="750" y="181" class="class-text" id="classText0"></text>
+          <text x="750" y="203" class="conf-text" id="confText0"></text>
+          <text x="750" y="291" class="class-text" id="classText1"></text>
+          <text x="750" y="313" class="conf-text" id="confText1"></text>
+        </g>
+      </svg>
+
+      <div class="legend">
+        <span><svg width="18" height="18" viewBox="-9 -9 18 18"><path class="stone-icon" data-sign="1" /></svg> positives Gewicht (verstärkt)</span>
+        <span><svg width="18" height="18" viewBox="-9 -9 18 18"><path class="stone-icon" data-sign="-1" /></svg> negatives Gewicht (hemmt)</span>
+        <span>Anzahl der Steine = Stärke des Gewichts</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Inputs der aktuellen Epoche</h2>
+      <ul class="status-list" id="statusList"></ul>
+      <div class="progress-head">
+        <strong id="progressText"></strong>
+        <span id="progressSub"></span>
+      </div>
+      <div class="segments" id="segments"></div>
+      <div class="accuracy" id="accuracyText"></div>
+    </section>
+  </main>
+
+  <!-- ===================== Seitenleiste ===================== -->
+  <aside class="sidebar">
+    <section class="card">
+      <h2>Steuerung</h2>
+      <div class="btn-row">
+        <button class="primary" id="playBtn"></button>
+        <button id="stepBtn" title="Nächster Schritt (→)">⏭ Weiter</button>
+        <button id="resetBtn">↺ Reset</button>
+      </div>
+
+      <div class="field">
+        <label for="speed">Geschwindigkeit</label>
+        <div class="field-inline">
+          <input type="range" id="speed" min="0" max="7" step="1" value="3">
+          <span class="speed-value" id="speedValue"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="toggle"><input type="checkbox" id="stepMode"> Schritt-Modus</label>
+        <div class="field-label" style="margin-top:8px">Ein Schritt ist …</div>
+        <div class="segmented" id="granularity">
+          <label><input type="radio" name="gran" value="phase">eine Phase</label>
+          <label><input type="radio" name="gran" value="image" checked>ein Bild</label>
+          <label><input type="radio" name="gran" value="epoch">eine Epoche</label>
+        </div>
+        <div class="hint">Tastatur: Leertaste = Start/Pause, → = Weiter</div>
+      </div>
+
+      <div class="field">
+        <label for="epochs">Anzahl Epochen (1–50)</label>
+        <input type="number" id="epochs" min="1" max="50" value="10">
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Labels</h2>
+      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
+      <div class="label-row"><span>o1</span><input type="text" id="label0" maxlength="16"></div>
+      <div class="label-row"><span>o2</span><input type="text" id="label1" maxlength="16"></div>
+    </section>
+
+    <section class="card">
+      <h2>Trainingsbilder</h2>
+      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept="image/*" multiple hidden>
+        Bilder hierher ziehen oder <u>auswählen</u>
+      </label>
+      <ul class="input-list" id="inputList"></ul>
+      <div class="input-actions">
+        <button id="samplesBtn">Beispiele laden</button>
+        <button id="clearBtn">Alle entfernen</button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+/* =========================================================================
+   1. Konfiguration
+   ========================================================================= */
+
+// Netz-Geometrie wie im Original-SVG
+const NODE_R = 35;
+const NODES = {
+  i1: { x: 150, y: 120, layer: 'input' },
+  i2: { x: 150, y: 230, layer: 'input' },
+  i3: { x: 150, y: 340, layer: 'input' },
+  h1: { x: 425, y: 120, layer: 'hidden' },
+  h2: { x: 425, y: 230, layer: 'hidden' },
+  h3: { x: 425, y: 340, layer: 'hidden' },
+  o1: { x: 700, y: 175, layer: 'output' },
+  o2: { x: 700, y: 285, layer: 'output' },
+};
+const LAYERS = { input: ['i1', 'i2', 'i3'], hidden: ['h1', 'h2', 'h3'], output: ['o1', 'o2'] };
+const LAYER_STYLE = {
+  input:  { color: '#f3922c', width: 5 },
+  hidden: { color: '#0f3c64', width: 6 },
+  output: { color: '#7ab84f', width: 5 },
+};
+
+// Verbindungen: stage 0 = Input→Hidden, stage 1 = Hidden→Output
+const LINKS = [];
+for (const from of LAYERS.input) for (const to of LAYERS.hidden) LINKS.push({ id: `${from}-${to}`, from, to, stage: 0 });
+for (const from of LAYERS.hidden) for (const to of LAYERS.output) LINKS.push({ id: `${from}-${to}`, from, to, stage: 1 });
+
+// Position, an der das Trainingsbild mit den Input-Knoten verbunden wird
+const IMAGE_ANCHOR = { x: -50, y: 230 };
+
+// Steine (Gewichte)
+const STONE = {
+  max: 4,          // max. Steine pro Verbindung
+  startOffset: 56, // Abstand des ersten Steins vom Startknoten
+  spacing: 16,     // Abstand zwischen Steinen
+  colors: { 1: '#6cae45', '-1': '#ee1c1c' },
+  // Formen nach den Vorlagen (grün: Tropfen, rot: abgerundetes Viereck)
+  shapes: {
+    1: 'M-6.5,-6.8 C-3,-8.6 3.5,-8.4 6.6,-6 C8.2,-2.6 7.6,2.6 6.8,7.6 C3.6,6.4 0.4,6.2 -2.8,7.2 C-6.8,7.6 -8.4,3.4 -8.2,-0.6 C-8.2,-3.6 -8.4,-5.8 -6.5,-6.8 Z',
+    '-1': 'M-5.4,-8.2 C-1.2,-9 4,-8.2 6,-6.4 C7.6,-2.6 8.4,2.6 7.2,7.2 C3,8.4 -2,8.2 -6.2,7 C-7.6,2.8 -8.4,-2.2 -7.4,-6 C-7,-7.4 -6.4,-8 -5.4,-8.2 Z',
+  },
+};
+
+const PHASES = [
+  { key: 'present',  label: 'Bild anlegen' },
+  { key: 'forward',  label: 'Vorwärtsdurchlauf' },
+  { key: 'predict',  label: 'Vorhersage' },
+  { key: 'evaluate', label: 'Bewertung' },
+  { key: 'update',   label: 'Gewichte anpassen' },
+];
+
+// Basisdauern in ms bei Geschwindigkeit 1×
+const DURATION = {
+  imageIn: 300, linksIn: 450,
+  signal: 650, activate: 250,
+  predict: 600,
+  evaluate: 700,
+  imageOut: 300, stonesOut: 650, stonesIn: 800, updateHold: 500,
+};
+
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+const ACCURACY_START = 0.4; // simulierte Trefferquote in der ersten Epoche
+const ACCURACY_END = 0.95;  // … und in der letzten
+
+/* =========================================================================
+   2. Zustand
+   ========================================================================= */
+
+const state = {
+  labels: ['Katze', 'Hund'],
+  inputs: [],          // { id, src, name, label: 0|1 }
+  epochs: 10,
+  speed: 1,
+  stepMode: false,
+  granularity: 'image', // 'phase' | 'image' | 'epoch'
+  status: 'idle',       // 'idle' | 'running' | 'paused' | 'stepwait' | 'done'
+  phase: null,
+  epoch: 0,             // aktuelle Epoche (0-basiert)
+  completedEpochs: 0,
+  results: [],          // pro Input: { status: 'pending'|'active'|'correct'|'wrong', pred }
+  history: [],          // Genauigkeit pro abgeschlossener Epoche
+  weights: {},          // linkId -> Gewicht in [-1, 1]
+  targets: {},          // linkId -> Zielgewicht, gegen das das Training konvergiert
+};
+
+let current = null;    // Simulationsdaten des aktuellen Bildes
+let runToken = 0;      // wird bei Reset erhöht -> laufende Animationen brechen ab
+let gateResolve = null;
+let nextInputId = 1;
+const CANCEL = Symbol('cancel');
+
+/* =========================================================================
+   3. Hilfsfunktionen
+   ========================================================================= */
+
+const $ = id => document.getElementById(id);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const easeOutBack = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+function gauss() {
+  const u = 1 - Math.random(), v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const labelName = idx => state.labels[idx];
+const pct = v => `${Math.round(v * 100)} %`;
+
+/**
+ * Animations-Tween, der Geschwindigkeit und Pause berücksichtigt.
+ * Bricht mit CANCEL ab, sobald ein Reset erfolgt ist.
+ */
+function tween(ms, onUpdate, token) {
+  return new Promise((resolve, reject) => {
+    let elapsed = 0;
+    let last = performance.now();
+    const frame = now => {
+      if (token !== runToken) return reject(CANCEL);
+      const dt = Math.min(now - last, 100);
+      last = now;
+      if (state.status !== 'paused') elapsed += dt * state.speed;
+      const t = ms <= 0 ? 1 : Math.min(1, elapsed / ms);
+      onUpdate(t);
+      if (t < 1) requestAnimationFrame(frame); else resolve();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+const wait = (ms, token) => tween(ms, () => {}, token);
+
+// Fortschritt eines Elements innerhalb eines gestaffelten Tweens
+function staggered(t, index, spread = 0.35) {
+  const start = (index / (STONE.max - 1)) * spread;
+  return clamp((t - start) / (1 - spread));
+}
+
+/* =========================================================================
+   4. Simulation (keine echte Berechnung – nur plausibles Verhalten)
+   ========================================================================= */
+
+function initWeights() {
+  for (const l of LINKS) {
+    state.weights[l.id] = Math.random() * 2 - 1;
+    const magnitude = 0.3 + Math.random() * 0.7;
+    state.targets[l.id] = Math.random() < 0.5 ? -magnitude : magnitude;
+  }
+}
+
+function stonesFor(w) {
+  return { count: Math.min(STONE.max, Math.round(Math.abs(w) * STONE.max)), sign: w >= 0 ? 1 : -1 };
+}
+
+// Trefferquote steigt über die Epochen von ACCURACY_START auf ACCURACY_END
+function epochProgress(e) {
+  return state.epochs > 1 ? e / (state.epochs - 1) : 0;
+}
+function accuracyForEpoch(e) {
+  const t = epochProgress(e);
+  return lerp(ACCURACY_START, ACCURACY_END, 1 - Math.pow(1 - t, 2));
+}
+
+function simulateImage(e, k) {
+  const input = state.inputs[k];
+  const correct = Math.random() < accuracyForEpoch(e);
+  const conf = clamp(0.55 + Math.random() * 0.15 + 0.25 * epochProgress(e), 0, 0.98);
+  return {
+    k,
+    correct,
+    pred: correct ? input.label : 1 - input.label,
+    conf,
+    hidden: LAYERS.hidden.map(() => 0.2 + Math.random() * 0.8),
+  };
+}
+
+// Gewichte nähern sich dem Ziel; mehr Fehler -> stärkere (zufällige) Korrekturen
+function updateWeights(errorRate) {
+  const lr = 1 - Math.pow(0.08, 1 / state.epochs);
+  for (const l of LINKS) {
+    const w = state.weights[l.id];
+    const next = w + lr * (state.targets[l.id] - w) + errorRate * 0.35 * gauss();
+    state.weights[l.id] = clamp(next, -1, 1);
+  }
+}
+
+/* =========================================================================
+   5. Rendering – Netz
+   ========================================================================= */
+
+const linkEls = {};     // linkId -> <line>
+const nodeEls = {};     // nodeId -> { overlay, ring }
+const stoneSlots = {};  // linkId -> [{ inner, path }]
+const inputLines = [];  // Linien Bild -> Input-Knoten
+
+function buildNetwork() {
+  const linksG = $('links'), nodesG = $('nodes'), stonesG = $('stones'), inputG = $('inputLinks');
+
+  for (const l of LINKS) {
+    const a = NODES[l.from], b = NODES[l.to];
+    const line = svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'link' });
+    linksG.append(line);
+    linkEls[l.id] = line;
+
+    // Stein-Plätze entlang der Linie, nahe am Startknoten
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    const angle = Math.atan2(uy, ux) * 180 / Math.PI;
+    stoneSlots[l.id] = [];
+    for (let i = 0; i < STONE.max; i++) {
+      const d = STONE.startOffset + i * STONE.spacing;
+      const off = (i % 2 ? 1.5 : -1.5);            // leichter Zickzack wie im Vorbild
+      const x = a.x + ux * d - uy * off;
+      const y = a.y + uy * d + ux * off;
+      const rot = angle + [-12, 9, -4, 14][i];
+      const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})` });
+      const inner = svgEl('g');
+      const path = svgEl('path', { class: 'stone' });
+      inner.append(path);
+      g.append(inner);
+      stonesG.append(g);
+      stoneSlots[l.id].push({ inner, path });
+    }
+  }
+
+  for (const [id, n] of Object.entries(NODES)) {
+    const style = LAYER_STYLE[n.layer];
+    const ring = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R + 10, fill: 'none', 'stroke-width': 4, opacity: 0 });
+    const base = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R, fill: '#fff', stroke: style.color, 'stroke-width': style.width });
+    const overlay = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R - style.width / 2, fill: style.color, opacity: 0 });
+    const text = svgEl('text', { x: n.x, y: n.y + 6, class: 'node-text' });
+    text.textContent = id;
+    nodesG.append(ring, base, overlay, text);
+    nodeEls[id] = { ring, overlay };
+  }
+
+  for (const id of LAYERS.input) {
+    const n = NODES[id];
+    const len = Math.hypot(n.x - IMAGE_ANCHOR.x, n.y - IMAGE_ANCHOR.y);
+    const line = svgEl('line', {
+      x1: IMAGE_ANCHOR.x, y1: IMAGE_ANCHOR.y, x2: n.x, y2: n.y,
+      stroke: '#f3922c', 'stroke-width': 2.5, 'stroke-dasharray': len, 'stroke-dashoffset': len,
+    });
+    line.len = len;
+    inputG.append(line);
+    inputLines.push(line);
+  }
+
+  // Legenden-Icons
+  document.querySelectorAll('.stone-icon').forEach(p => {
+    const sign = p.dataset.sign;
+    p.setAttribute('d', STONE.shapes[sign]);
+    p.setAttribute('fill', STONE.colors[sign]);
+    p.setAttribute('class', 'stone');
+    p.setAttribute('stroke', '#13283f');
+    p.setAttribute('stroke-width', '1.6');
+  });
+}
+
+function setStoneSign(slot, sign) {
+  slot.path.setAttribute('d', STONE.shapes[sign]);
+  slot.path.setAttribute('fill', STONE.colors[sign]);
+}
+function setStoneVisual(slot, scale, opacity, dy = 0) {
+  slot.inner.setAttribute('transform', `translate(0 ${dy.toFixed(2)}) scale(${Math.max(0.001, scale).toFixed(3)})`);
+  slot.inner.setAttribute('opacity', opacity.toFixed(3));
+}
+
+function renderStonesInstant() {
+  for (const l of LINKS) {
+    const { count, sign } = stonesFor(state.weights[l.id]);
+    stoneSlots[l.id].forEach((slot, i) => {
+      setStoneSign(slot, sign);
+      setStoneVisual(slot, i < count ? 1 : 0, i < count ? 1 : 0);
+    });
+  }
+}
+
+/** Animiert die Stein-Änderungen: erst wegnehmen, dann neu hinlegen. */
+async function animateStoneChanges(oldW, newW, token) {
+  const removals = [], additions = [], changed = [];
+  for (const l of LINKS) {
+    const o = stonesFor(oldW[l.id]), n = stonesFor(newW[l.id]);
+    const slots = stoneSlots[l.id];
+    const flip = o.sign !== n.sign && o.count > 0 && n.count > 0;
+    if (!flip && o.count === n.count) continue;
+    changed.push(l.id);
+    if (flip) {
+      for (let i = 0; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i });
+      for (let i = 0; i < n.count; i++) additions.push({ slot: slots[i], order: i, sign: n.sign });
+    } else if (n.count > o.count) {
+      for (let i = o.count; i < n.count; i++) additions.push({ slot: slots[i], order: i - o.count, sign: n.sign });
+    } else {
+      for (let i = n.count; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i });
+    }
+  }
+
+  changed.forEach(id => linkEls[id].classList.add('changed'));
+  try {
+    if (removals.length) {
+      await tween(DURATION.stonesOut, t => {
+        for (const r of removals) {
+          const p = easeInOut(staggered(t, r.order));
+          setStoneVisual(r.slot, 1 - 0.8 * p, 1 - p, -10 * p);
+        }
+      }, token);
+    }
+    additions.forEach(a => { setStoneSign(a.slot, a.sign); setStoneVisual(a.slot, 0, 0); });
+    if (additions.length) {
+      await tween(DURATION.stonesIn, t => {
+        for (const a of additions) {
+          const p = staggered(t, a.order);
+          setStoneVisual(a.slot, 0.3 + 0.7 * easeOutBack(p), clamp(p * 2), -14 * (1 - easeInOut(p)));
+        }
+      }, token);
+    }
+    await wait(DURATION.updateHold, token);
+  } finally {
+    changed.forEach(id => linkEls[id].classList.remove('changed'));
+  }
+  return changed.length;
+}
+
+/** Signale wandern entlang der Verbindungen; Farbe/Größe zeigt das Gewicht. */
+async function animateSignals(stage, token) {
+  const links = LINKS.filter(l => l.stage === stage);
+  const pulses = links.map(l => {
+    const { count, sign } = stonesFor(state.weights[l.id]);
+    const c = svgEl('circle', {
+      r: 3 + count * 1.3,
+      fill: count ? STONE.colors[sign] : '#9aa5b1',
+      stroke: '#13283f', 'stroke-width': 1,
+    });
+    $('pulses').append(c);
+    linkEls[l.id].classList.add('active');
+    return { l, c };
+  });
+  try {
+    await tween(DURATION.signal, t => {
+      const e = easeInOut(t);
+      for (const { l, c } of pulses) {
+        const a = NODES[l.from], b = NODES[l.to];
+        c.setAttribute('cx', lerp(a.x, b.x, e));
+        c.setAttribute('cy', lerp(a.y, b.y, e));
+      }
+    }, token);
+  } finally {
+    pulses.forEach(p => p.c.remove());
+    links.forEach(l => linkEls[l.id].classList.remove('active'));
+  }
+}
+
+function setBadge(correct) {
+  $('badgeCircle').setAttribute('fill', correct ? 'var(--ok)' : 'var(--bad)');
+  $('badgeIcon').setAttribute('d', correct
+    ? 'M-61,174 L-56,180 L-46,167'
+    : 'M-60,168 L-48,180 M-48,168 L-60,180');
+}
+
+/** Entfernt alle Hervorhebungen eines Bild-Durchlaufs. */
+function resetTransient() {
+  $('pulses').replaceChildren();
+  Object.values(linkEls).forEach(el => el.classList.remove('active', 'changed'));
+  for (const { overlay, ring } of Object.values(nodeEls)) {
+    overlay.setAttribute('opacity', 0);
+    ring.setAttribute('opacity', 0);
+    ring.removeAttribute('stroke-dasharray');
+  }
+  inputLines.forEach(l => l.setAttribute('stroke-dashoffset', l.len));
+  $('badge').setAttribute('opacity', 0);
+  [0, 1].forEach(i => {
+    $(`classText${i}`).classList.remove('predicted');
+    $(`confText${i}`).textContent = '';
+  });
+}
+
+function hideImage() {
+  $('imgGroup').setAttribute('opacity', 0);
+  $('imgPlaceholder').setAttribute('opacity', 1);
+}
+
+function renderClassLabels() {
+  $('classText0').textContent = labelName(0);
+  $('classText1').textContent = labelName(1);
+  if (current && state.status !== 'idle') $('imgLabel').textContent = `Label: ${labelName(state.inputs[current.k].label)}`;
+}
+
+/* =========================================================================
+   6. Rendering – Panels
+   ========================================================================= */
+
+function renderPhaseBar() {
+  $('phaseBar').replaceChildren(...PHASES.map(p => {
+    const li = document.createElement('li');
+    li.textContent = p.label;
+    if (p.key === state.phase) li.className = 'current';
+    return li;
+  }));
+}
+
+function setCaption(html) { $('caption').innerHTML = html; }
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+const L = idx => `<strong>${escapeHtml(labelName(idx))}</strong>`;
+
+function renderStatusList() {
+  const list = $('statusList');
+  if (!state.inputs.length) {
+    list.innerHTML = '<li class="empty-hint">Noch keine Trainingsbilder – rechts Bilder hinzufügen.</li>';
+    return;
+  }
+  list.replaceChildren(...state.inputs.map((inp, k) => {
+    const res = state.results[k] || { status: 'pending' };
+    const li = document.createElement('li');
+    li.className = `chip ${res.status}`;
+    const img = document.createElement('img');
+    img.src = inp.src;
+    img.alt = '';
+    const text = document.createElement('div');
+    text.className = 'chip-text';
+    const main = document.createElement('span');
+    main.textContent = labelName(inp.label);
+    const sub = document.createElement('span');
+    sub.className = 'chip-sub';
+    sub.textContent = {
+      pending: 'ausstehend',
+      active: 'wird verarbeitet …',
+      correct: 'richtig erkannt',
+      wrong: res.pred != null ? `erkannt: ${labelName(res.pred)}` : 'falsch',
+    }[res.status];
+    text.append(main, sub);
+    const icon = document.createElement('span');
+    icon.className = 'chip-icon';
+    icon.textContent = { pending: '·', active: '▸', correct: '✓', wrong: '✗' }[res.status];
+    li.append(img, text, icon);
+    return li;
+  }));
+}
+
+function epochAccuracy() {
+  const done = state.results.filter(r => r.status === 'correct' || r.status === 'wrong');
+  const correct = done.filter(r => r.status === 'correct').length;
+  return { done: done.length, correct };
+}
+
+function renderProgress() {
+  const n = state.epochs;
+  $('progressText').textContent = `Abgeschlossene Epochen: ${state.completedEpochs} von ${n}`;
+  const running = ['running', 'paused', 'stepwait'].includes(state.status);
+  $('progressSub').textContent = running ? `aktuell: Epoche ${state.epoch + 1}` : (state.status === 'done' ? 'Training abgeschlossen' : '');
+
+  const segs = $('segments');
+  if (segs.children.length !== n) {
+    segs.replaceChildren(...Array.from({ length: n }, () => {
+      const s = document.createElement('div');
+      s.className = 'seg';
+      s.innerHTML = '<div class="fill"></div>';
+      return s;
+    }));
+  }
+  const { done } = epochAccuracy();
+  [...segs.children].forEach((s, i) => {
+    const isDone = i < state.completedEpochs;
+    s.classList.toggle('done', isDone);
+    const fill = s.firstChild;
+    if (isDone) fill.style.width = '';
+    else if (running && i === state.epoch && state.inputs.length) fill.style.width = `${(done / state.inputs.length) * 100}%`;
+    else fill.style.width = '0';
+    s.title = isDone ? `Epoche ${i + 1}: ${pct(state.history[i])} richtig` : `Epoche ${i + 1}`;
+  });
+
+  const parts = [];
+  if (running || state.status === 'done') {
+    const { done: d, correct } = epochAccuracy();
+    if (d) parts.push(`Diese Epoche: ${correct} von ${d} richtig (${pct(correct / d)})`);
+  }
+  if (state.history.length) parts.push(`Letzte abgeschlossene Epoche: ${pct(state.history[state.history.length - 1])}`);
+  $('accuracyText').textContent = parts.join(' · ');
+}
+
+function renderControls() {
+  const s = state.status;
+  const hasInputs = state.inputs.length > 0;
+  const play = $('playBtn');
+  play.textContent = { idle: '▶ Start', running: '⏸ Pause', paused: '▶ Fortsetzen', stepwait: '▶ Start', done: '▶ Start' }[s];
+  play.disabled = state.stepMode || s === 'done' || s === 'stepwait' || !hasInputs;
+  $('stepBtn').disabled = !state.stepMode || !(s === 'idle' || s === 'stepwait') || !hasInputs;
+  $('granularity').classList.toggle('dim', !state.stepMode);
+  $('speedValue').textContent = `${String(state.speed).replace('.', ',')}×`;
+
+  const locked = s !== 'idle';
+  document.body.classList.toggle('locked', locked);
+  $('epochs').disabled = locked;
+  $('label0').disabled = locked;
+  $('label1').disabled = locked;
+  $('fileInput').disabled = locked;
+  $('samplesBtn').disabled = locked;
+  $('clearBtn').disabled = locked || !hasInputs;
+  document.querySelectorAll('#inputList select, #inputList button').forEach(el => { el.disabled = locked; });
+}
+
+function renderInputEditor() {
+  $('inputList').replaceChildren(...state.inputs.map(inp => {
+    const li = document.createElement('li');
+    li.className = 'input-item';
+    const img = document.createElement('img');
+    img.src = inp.src;
+    img.alt = inp.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = inp.name;
+    name.title = inp.name;
+    const select = document.createElement('select');
+    state.labels.forEach((lbl, i) => select.add(new Option(lbl, i, false, inp.label === i)));
+    select.addEventListener('change', () => { inp.label = Number(select.value); renderStatusList(); });
+    meta.append(name, select);
+    const remove = document.createElement('button');
+    remove.className = 'remove';
+    remove.textContent = '×';
+    remove.title = 'Entfernen';
+    remove.addEventListener('click', () => {
+      state.inputs = state.inputs.filter(x => x !== inp);
+      resetResults();
+      renderAll();
+    });
+    li.append(img, meta, remove);
+    return li;
+  }));
+}
+
+function renderAll() {
+  renderClassLabels();
+  renderPhaseBar();
+  renderStatusList();
+  renderProgress();
+  renderInputEditor();
+  renderControls();
+}
+
+/* =========================================================================
+   7. Trainingsablauf (Phasen)
+   ========================================================================= */
+
+async function phasePresent(e, k, token) {
+  if (k === 0) resetResults();
+  resetTransient();
+  current = simulateImage(e, k);
+  const input = state.inputs[k];
+  state.results[k].status = 'active';
+  renderStatusList();
+  renderProgress();
+  setCaption(`Epoche ${e + 1}, Bild ${k + 1}/${state.inputs.length}: Das Bild mit dem Label ${L(input.label)} wird an die Input-Knoten gelegt.`);
+
+  $('imgEl').setAttribute('href', input.src);
+  $('imgLabel').textContent = `Label: ${labelName(input.label)}`;
+  $('imgPlaceholder').setAttribute('opacity', 0);
+  await tween(DURATION.imageIn, t => $('imgGroup').setAttribute('opacity', t), token);
+  await tween(DURATION.linksIn, t => {
+    const p = easeInOut(t);
+    inputLines.forEach(l => l.setAttribute('stroke-dashoffset', l.len * (1 - p)));
+    LAYERS.input.forEach(id => nodeEls[id].overlay.setAttribute('opacity', 0.35 * p));
+  }, token);
+}
+
+async function phaseForward(token) {
+  setCaption('Vorwärtsdurchlauf: Die Signale laufen durch das Netz. Die Steine auf den Verbindungen bestimmen, wie stark ein Signal weitergegeben wird.');
+  await animateSignals(0, token);
+  await tween(DURATION.activate, t => {
+    LAYERS.hidden.forEach((id, i) => nodeEls[id].overlay.setAttribute('opacity', current.hidden[i] * 0.45 * t));
+  }, token);
+  await animateSignals(1, token);
+  await tween(DURATION.activate, t => {
+    LAYERS.output.forEach((id, i) => {
+      const act = i === current.pred ? current.conf : 1 - current.conf;
+      nodeEls[id].overlay.setAttribute('opacity', act * 0.6 * t);
+    });
+  }, token);
+}
+
+async function phasePredict(token) {
+  const { pred, conf } = current;
+  const ring = nodeEls[LAYERS.output[pred]].ring;
+  ring.setAttribute('stroke', '#0f3c64');
+  ring.setAttribute('stroke-dasharray', '6 5');
+  $(`classText${pred}`).classList.add('predicted');
+  $(`confText${pred}`).textContent = pct(conf);
+  $(`confText${1 - pred}`).textContent = pct(1 - conf);
+  setCaption(`Vorhersage: Das Netz hält das Bild für ${L(pred)} (${pct(conf)}).`);
+  await tween(DURATION.predict, t => ring.setAttribute('opacity', easeInOut(t)), token);
+}
+
+async function phaseEvaluate(k, token) {
+  const { pred, correct } = current;
+  const truth = state.inputs[k].label;
+  const ring = nodeEls[LAYERS.output[pred]].ring;
+  ring.removeAttribute('stroke-dasharray');
+  ring.setAttribute('stroke', correct ? 'var(--ok)' : 'var(--bad)');
+  if (!correct) {
+    const truthRing = nodeEls[LAYERS.output[truth]].ring;
+    truthRing.setAttribute('stroke', 'var(--ok)');
+    truthRing.setAttribute('stroke-dasharray', '6 5');
+  }
+  setBadge(correct);
+  state.results[k] = { status: correct ? 'correct' : 'wrong', pred };
+  renderStatusList();
+  renderProgress();
+  setCaption(correct
+    ? `Richtig! Das Bild ist ${L(truth)} und wurde als ${L(pred)} erkannt.`
+    : `Falsch! Das Bild ist ${L(truth)}, das Netz hat aber ${L(pred)} vorhergesagt.`);
+  await tween(DURATION.evaluate, t => {
+    $('badge').setAttribute('opacity', clamp(t * 3));
+    if (!correct) nodeEls[LAYERS.output[truth]].ring.setAttribute('opacity', clamp(t * 2));
+  }, token);
+}
+
+async function phaseUpdate(e, token) {
+  const errors = state.results.filter(r => r.status === 'wrong').length;
+  const errorRate = errors / state.inputs.length;
+  setCaption(`Ende von Epoche ${e + 1}: ${errors} von ${state.inputs.length} Bildern falsch. Das Netz passt seine Gewichte an und legt die Steine um.`);
+
+  resetTransient();
+  current = null;
+  await tween(DURATION.imageOut, t => $('imgGroup').setAttribute('opacity', 1 - t), token);
+  hideImage();
+
+  const oldW = { ...state.weights };
+  updateWeights(errorRate);
+  const changed = await animateStoneChanges(oldW, state.weights, token);
+
+  state.completedEpochs = e + 1;
+  state.history.push(1 - errorRate);
+  setCaption(`Epoche ${e + 1} abgeschlossen: ${changed} von ${LINKS.length} Verbindungen haben ihre Steine verändert.`);
+  renderProgress();
+}
+
+function isBoundary(kind) {
+  if (state.granularity === 'phase') return true;
+  if (state.granularity === 'image') return kind === 'evaluate' || kind === 'update';
+  return kind === 'update';
+}
+
+// Wartet im Schritt-Modus auf „Weiter“
+async function gate(token) {
+  setStatus('stepwait');
+  await new Promise(resolve => { gateResolve = resolve; });
+  gateResolve = null;
+  if (token !== runToken) throw CANCEL;
+  setStatus('running');
+}
+function releaseGate() { if (gateResolve) gateResolve(); }
+
+async function step(kind, fn, token, isLast = false) {
+  state.phase = kind;
+  renderPhaseBar();
+  await fn();
+  if (token !== runToken) throw CANCEL;
+  if (state.stepMode && !isLast && isBoundary(kind)) await gate(token);
+}
+
+async function runTraining(token) {
+  try {
+    const n = state.inputs.length;
+    for (let e = 0; e < state.epochs; e++) {
+      state.epoch = e;
+      for (let k = 0; k < n; k++) {
+        await step('present', () => phasePresent(e, k, token), token);
+        await step('forward', () => phaseForward(token), token);
+        await step('predict', () => phasePredict(token), token);
+        await step('evaluate', () => phaseEvaluate(k, token), token);
+      }
+      await step('update', () => phaseUpdate(e, token), token, e === state.epochs - 1);
+    }
+    finishTraining();
+  } catch (err) {
+    if (err !== CANCEL) console.error(err);
+  }
+}
+
+/* =========================================================================
+   8. Steuerung
+   ========================================================================= */
+
+function setStatus(s) {
+  state.status = s;
+  renderControls();
+  renderProgress();
+}
+
+function resetResults() {
+  state.results = state.inputs.map(() => ({ status: 'pending', pred: null }));
+}
+
+function startTraining() {
+  if (!state.inputs.length) return;
+  state.epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
+  $('epochs').value = state.epochs;
+  state.completedEpochs = 0;
+  state.history = [];
+  state.epoch = 0;
+  resetResults();
+  setStatus('running');
+  runTraining(++runToken);
+}
+
+function finishTraining() {
+  state.phase = null;
+  setStatus('done');
+  renderPhaseBar();
+  const last = state.history[state.history.length - 1];
+  setCaption(`Training abgeschlossen: ${state.epochs} Epochen, Genauigkeit in der letzten Epoche <strong>${pct(last)}</strong>. Mit Reset startest du neu.`);
+}
+
+function resetAll() {
+  runToken++;
+  releaseGate();
+  current = null;
+  state.status = 'idle';
+  state.phase = null;
+  state.epoch = 0;
+  state.completedEpochs = 0;
+  state.history = [];
+  state.epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
+  resetResults();
+  initWeights();
+  resetTransient();
+  hideImage();
+  renderStonesInstant();
+  setCaption('Bereit. Starte das Training mit <strong>▶ Start</strong> oder aktiviere den Schritt-Modus.');
+  renderAll();
+}
+
+function togglePlay() {
+  if (state.stepMode) return;
+  if (state.status === 'idle') startTraining();
+  else if (state.status === 'running') setStatus('paused');
+  else if (state.status === 'paused') setStatus('running');
+}
+
+function nextStep() {
+  if (!state.stepMode) return;
+  if (state.status === 'idle') startTraining();
+  else if (state.status === 'stepwait') releaseGate();
+}
+
+/* =========================================================================
+   9. Inputs (Upload & Beispielbilder)
+   ========================================================================= */
+
+function loadImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        // auf max. 256 px verkleinern, damit viele Bilder flüssig bleiben
+        const scale = Math.min(1, 256 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addFiles(files) {
+  if (state.status !== 'idle') return;
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    try {
+      const src = await loadImageFile(file);
+      state.inputs.push({ id: nextInputId++, src, name: file.name, label: 0 });
+    } catch (err) {
+      console.warn('Bild konnte nicht geladen werden:', file.name, err);
+    }
+  }
+  resetResults();
+  renderAll();
+}
+
+const svgUri = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+function catImage(fur, bg) {
+  return svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="${bg}"/>
+    <path d="M22 44 L27 12 L47 30 Z M78 44 L73 12 L53 30 Z" fill="${fur}" stroke="#333" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="50" cy="56" r="30" fill="${fur}" stroke="#333" stroke-width="2"/>
+    <ellipse cx="39" cy="50" rx="4" ry="6" fill="#333"/><ellipse cx="61" cy="50" rx="4" ry="6" fill="#333"/>
+    <path d="M45 61 L55 61 L50 66 Z" fill="#e88"/>
+    <path d="M50 66 Q45 72 40 68 M50 66 Q55 72 60 68" stroke="#333" stroke-width="2" fill="none"/>
+    <path d="M30 62 L12 58 M30 67 L12 69 M70 62 L88 58 M70 67 L88 69" stroke="#333" stroke-width="1.5"/>
+  </svg>`);
+}
+
+function dogImage(fur, ear, bg) {
+  return svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="${bg}"/>
+    <ellipse cx="24" cy="46" rx="11" ry="23" fill="${ear}" stroke="#333" stroke-width="2" transform="rotate(18 24 46)"/>
+    <ellipse cx="76" cy="46" rx="11" ry="23" fill="${ear}" stroke="#333" stroke-width="2" transform="rotate(-18 76 46)"/>
+    <ellipse cx="50" cy="52" rx="27" ry="30" fill="${fur}" stroke="#333" stroke-width="2"/>
+    <ellipse cx="50" cy="67" rx="15" ry="12" fill="#fff" opacity=".75"/>
+    <circle cx="40" cy="46" r="4" fill="#333"/><circle cx="60" cy="46" r="4" fill="#333"/>
+    <ellipse cx="50" cy="61" rx="6.5" ry="4.5" fill="#333"/>
+    <path d="M45 72 Q50 84 55 72 Z" fill="#e66" stroke="#333" stroke-width="1.2"/>
+  </svg>`);
+}
+
+function loadSamples() {
+  const samples = [
+    { src: catImage('#f0a23b', '#fff4e0'), label: 0 },
+    { src: dogImage('#b07a4a', '#6e4626', '#e8f1fb'), label: 1 },
+    { src: catImage('#9aa0a8', '#eef5ea'), label: 0 },
+    { src: dogImage('#f1dcb4', '#c79a5d', '#fdf0f0'), label: 1 },
+    { src: catImage('#4a4a4a', '#f3eefa'), label: 0 },
+    { src: dogImage('#ffffff', '#8a5a33', '#fff9db'), label: 1 },
+  ];
+  state.inputs = samples.map((s, i) => ({ id: nextInputId++, src: s.src, name: `Beispiel ${i + 1}`, label: s.label }));
+  resetResults();
+  renderAll();
+}
+
+/* =========================================================================
+   10. Events & Start
+   ========================================================================= */
+
+function bindEvents() {
+  $('playBtn').addEventListener('click', togglePlay);
+  $('stepBtn').addEventListener('click', nextStep);
+  $('resetBtn').addEventListener('click', resetAll);
+
+  $('speed').addEventListener('input', e => {
+    state.speed = SPEEDS[Number(e.target.value)];
+    renderControls();
+  });
+
+  $('stepMode').addEventListener('change', e => {
+    state.stepMode = e.target.checked;
+    if (!state.stepMode && state.status === 'stepwait') releaseGate();
+    if (state.stepMode && state.status === 'paused') setStatus('running'); // läuft bis zur nächsten Schrittgrenze
+    renderControls();
+  });
+
+  document.querySelectorAll('input[name=gran]').forEach(r =>
+    r.addEventListener('change', () => { state.granularity = r.value; }));
+
+  $('epochs').addEventListener('change', () => {
+    state.epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
+    $('epochs').value = state.epochs;
+    renderProgress();
+  });
+
+  [0, 1].forEach(i => {
+    $(`label${i}`).addEventListener('input', e => {
+      state.labels[i] = e.target.value.trim() || `Klasse ${i + 1}`;
+      renderClassLabels();
+      renderStatusList();
+      renderInputEditor();
+      renderControls();
+    });
+  });
+
+  $('fileInput').addEventListener('change', e => {
+    addFiles([...e.target.files]);
+    e.target.value = '';
+  });
+  const dz = $('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); if (state.status === 'idle') dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('over');
+    addFiles([...e.dataTransfer.files]);
+  });
+
+  $('samplesBtn').addEventListener('click', loadSamples);
+  $('clearBtn').addEventListener('click', () => { state.inputs = []; resetResults(); renderAll(); });
+
+  document.addEventListener('keydown', e => {
+    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(document.activeElement?.tagName)) return;
+    if (e.code === 'Space') { e.preventDefault(); state.stepMode ? nextStep() : togglePlay(); }
+    if (e.code === 'ArrowRight') { e.preventDefault(); nextStep(); }
+  });
+}
+
+function init() {
+  $('label0').value = state.labels[0];
+  $('label1').value = state.labels[1];
+  buildNetwork();
+  bindEvents();
+  loadSamples();
+  resetAll();
+}
+
+init();
+</script>
+</body>
+</html>
