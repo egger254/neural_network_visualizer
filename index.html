@@ -94,13 +94,13 @@
   #net .link { stroke: #0f3c64; stroke-width: 0.75; transition: stroke-width .2s, stroke .2s; }
   #net .link.active { stroke-width: 1.5; }
   #net .link.changed { stroke: var(--orange); stroke-width: 1.75; }
-  #net .node-text { font-family: 'Courier New', monospace; font-weight: bold; font-size: 18px; text-anchor: middle; fill: #000; }
+  #net .node-text { font-family: 'Andale Mono', 'Courier New', monospace; font-weight: bold; font-size: 18px; text-anchor: middle; fill: #000; }
   #net .title-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 22px; text-anchor: middle; }
   #net .class-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 18px; fill: #000; }
   #net .class-text.predicted { fill: var(--blue); text-decoration: underline; }
   #net .placeholder { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); text-anchor: middle; }
   #net .img-label { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 15px; text-anchor: middle; fill: var(--text); }
-  #net .stone { stroke: var(--stone-edge); stroke-width: 1; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
+  #net .stone { stroke: var(--stone-edge); stroke-width: 2; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
   #net .bar-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--text); }
   #net .ghost { fill: none; stroke-width: 1; stroke-dasharray: 2 1.5; vector-effect: non-scaling-stroke; }
   #net .delta-bg { fill: #fff; stroke: var(--orange); stroke-width: 1.25; }
@@ -297,8 +297,9 @@
       <ol class="phase-bar" id="phaseBar"></ol>
       <div class="caption" id="caption"></div>
 
-      <svg id="net" xmlns="http://www.w3.org/2000/svg" viewBox="-190 0 1110 400" role="img" aria-label="Neuronales Netz">
+      <svg id="net" xmlns="http://www.w3.org/2000/svg" viewBox="-190 0 1030 400" role="img" aria-label="Neuronales Netz">
         <defs>
+          <filter id="ringGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" /></filter>
           <clipPath id="imgClip"><rect x="-170" y="170" width="120" height="120" rx="10" /></clipPath>
         </defs>
 
@@ -331,12 +332,12 @@
 
         <g class="titles">
           <text x="150" y="50" class="title-text" fill="#f3922c">Input Layer</text>
-          <text x="425" y="50" class="title-text" fill="#0f3c64">Hidden Layer</text>
-          <text x="700" y="50" class="title-text" fill="#7ab84f">Output Layer</text>
+          <text x="386" y="50" class="title-text" fill="#0f3c64">Hidden Layer</text>
+          <text x="622" y="50" class="title-text" fill="#7ab84f">Output Layer</text>
         </g>
         <g class="classes">
-          <text x="750" y="181" class="class-text" id="classText0"></text>
-          <text x="750" y="291" class="class-text" id="classText1"></text>
+          <text x="672" y="181" class="class-text" id="classText0"></text>
+          <text x="672" y="291" class="class-text" id="classText1"></text>
         </g>
       </svg>
 
@@ -447,17 +448,17 @@
    1. Konfiguration
    ========================================================================= */
 
-// Netz-Geometrie wie im Original-SVG
+// Netz-Geometrie: Original-SVG, horizontal gestaucht auf die Proportionen der Folien (Schichtabstand 236)
 const NODE_R = 35;
 const NODES = {
   i1: { x: 150, y: 120, layer: 'input' },
   i2: { x: 150, y: 230, layer: 'input' },
   i3: { x: 150, y: 340, layer: 'input' },
-  h1: { x: 425, y: 120, layer: 'hidden' },
-  h2: { x: 425, y: 230, layer: 'hidden' },
-  h3: { x: 425, y: 340, layer: 'hidden' },
-  o1: { x: 700, y: 175, layer: 'output' },
-  o2: { x: 700, y: 285, layer: 'output' },
+  h1: { x: 386, y: 120, layer: 'hidden' },
+  h2: { x: 386, y: 230, layer: 'hidden' },
+  h3: { x: 386, y: 340, layer: 'hidden' },
+  o1: { x: 622, y: 175, layer: 'output' },
+  o2: { x: 622, y: 285, layer: 'output' },
 };
 const LAYERS = { input: ['i1', 'i2', 'i3'], hidden: ['h1', 'h2', 'h3'], output: ['o1', 'o2'] };
 const LAYER_STYLE = {
@@ -477,8 +478,8 @@ const IMAGE_ANCHOR = { x: -50, y: 230 };
 // Steine (Gewichte)
 const STONE = {
   max: 3,          // max. Steine pro Verbindung (bei 4 kollidieren Steine an den Linienkreuzungen)
-  startOffset: 54, // Abstand des ersten Steins vom Startknoten (Mittelpunkt)
-  spacing: 22,     // Abstand zwischen den Stein-Mittelpunkten (16 px Stein + Lücke)
+  startOffset: 50, // Abstand des ersten Steins vom Startknoten (Mittelpunkt)
+  spacing: 21,     // Abstand zwischen den Stein-Mittelpunkten (16 px Stein + Lücke)
   colors: { 1: '#70ad47', '-1': '#ff0000' },
   // Form aus stone_green.svg, auf 16 px Breite skaliert und zentriert
   shape: 'M-6.53,-0.28 C-5.47,-1.15 -5.49,-6.94 -0.02,-6.99 0.60,-6.99 1.11,-6.49 1.67,-6.23 2.11,-5.70 2.63,-5.23 2.98,-4.64 3.90,-3.14 4.43,-1.41 5.47,0.01 5.94,0.64 6.75,0.92 7.39,1.37 7.50,2.26 8.09,3.23 7.72,4.05 7.36,4.87 6.24,5.06 5.52,5.60 4.97,6.01 4.46,6.47 3.93,6.91 3.08,6.53 2.20,6.23 1.39,5.78 -0.92,4.49 0.10,4.41 -2.22,3.67 -2.96,3.43 -3.75,3.32 -4.51,3.15 -4.95,2.62 -5.32,2.02 -5.83,1.55 -7.84,-0.29 -8.75,0.86 -6.39,-1.73 -6.24,-1.89 -7.59,0.60 -6.53,-0.28Z',
@@ -648,7 +649,7 @@ function updateWeights(errorRate, isLast) {
    ========================================================================= */
 
 const linkEls = {};     // linkId -> <line>
-const nodeEls = {};     // nodeId -> { overlay, ring }
+const nodeEls = {};     // nodeId -> { glow, ring }
 const stoneSlots = {};  // linkId -> [{ g, inner, path, box }]
 const inputLines = [];  // Linien Bild -> Input-Knoten
 const probBars = [];    // { name, value, fill } je Label
@@ -685,11 +686,12 @@ function buildNetwork() {
     const style = LAYER_STYLE[n.layer];
     const ring = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R + 10, fill: 'none', 'stroke-width': 4, opacity: 0 });
     const base = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R, fill: '#fff', stroke: style.color, 'stroke-width': style.width });
-    const overlay = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R - style.width / 2, fill: style.color, opacity: 0 });
+    // Aktivierung: weicher Schein um den Ring (Neuron selbst bleibt weiß)
+    const glow = svgEl('circle', { cx: n.x, cy: n.y, r: NODE_R, fill: 'none', stroke: style.color, 'stroke-width': 12, filter: 'url(#ringGlow)', opacity: 0 });
     const text = svgEl('text', { x: n.x, y: n.y + 6, class: 'node-text' });
     text.textContent = id;
-    nodesG.append(ring, base, overlay, text);
-    nodeEls[id] = { ring, overlay };
+    nodesG.append(glow, ring, base, text);
+    nodeEls[id] = { ring, glow };
   }
 
   for (const id of LAYERS.input) {
@@ -777,23 +779,29 @@ function createDeltaBadge(parts) {
   return { g, width: x, height: 18 };
 }
 
-/** Sucht entlang der Linie (hinter den Steinen) den ersten freien Platz für eine Plakette. */
-function placeDeltaBadge(linkId, w, h, placed) {
+/**
+ * Sucht hinter den Steinen den ersten freien Platz für eine Plakette: zuerst auf der Linie,
+ * dann leicht seitlich versetzt. Hindernisse sind andere Plaketten und belegte Stein-Plätze.
+ */
+function placeDeltaBadge(linkId, w, h, placed, stoneBoxes) {
   const l = LINKS.find(x => x.id === linkId);
   const a = NODES[l.from], b = NODES[l.to];
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
-  const stoneBoxes = Object.values(stoneSlots).flat().map(s => s.box);
-  const dStart = STONE.startOffset + STONE.max * STONE.spacing;
-  const boxAt = d => {
-    const cx = a.x + ux * d, cy = a.y + uy * d;
+  const dStart = STONE.startOffset + STONE.max * STONE.spacing - 8;
+  const boxAt = (d, off) => {
+    const cx = a.x + ux * d - uy * off, cy = a.y + uy * d + ux * off;
     return { cx, cy, x1: cx - w / 2 - 2, x2: cx + w / 2 + 2, y1: cy - h / 2 - 2, y2: cy + h / 2 + 2 };
   };
-  for (let d = dStart; d < len - NODE_R - w / 2; d += 4) {
-    const box = boxAt(d);
-    if (!placed.some(p => boxesOverlap(p, box)) && !stoneBoxes.some(sb => boxesOverlap(sb, box))) return box;
+  const nodeFree = box => Object.values(NODES).every(n =>
+    n.x + NODE_R + 4 < box.x1 || n.x - NODE_R - 4 > box.x2 || n.y + NODE_R + 4 < box.y1 || n.y - NODE_R - 4 > box.y2);
+  for (const off of [0, 13, -13, 24, -24, 35, -35]) {
+    for (let d = dStart; d < len - dStart / 2; d += 3) {
+      const box = boxAt(d, off);
+      if (nodeFree(box) && !placed.some(p => boxesOverlap(p, box)) && !stoneBoxes.some(sb => boxesOverlap(sb, box))) return box;
+    }
   }
-  return boxAt(dStart);
+  return boxAt(len / 2, 0);
 }
 
 function addGhost(slot, sign) {
@@ -836,10 +844,15 @@ async function animateStoneChanges(oldW, newW, token) {
   }
 
   changes.forEach(c => linkEls[c.id].classList.add('changed'));
+  // belegte Plätze nach dem Update (Steine + Geistersteine)
+  const stoneBoxes = LINKS.flatMap(l => {
+    const used = Math.max(stonesFor(oldW[l.id]).count, stonesFor(newW[l.id]).count);
+    return stoneSlots[l.id].slice(0, used).map(slot => slot.box);
+  });
   const placed = [];
   const badges = changes.map(c => {
     const badge = createDeltaBadge(c.parts);
-    const box = placeDeltaBadge(c.id, badge.width, badge.height, placed);
+    const box = placeDeltaBadge(c.id, badge.width, badge.height, placed, stoneBoxes);
     placed.push(box);
     return { ...badge, cx: box.cx, cy: box.cy };
   });
@@ -888,7 +901,7 @@ async function animateSignals(stage, token) {
     const c = svgEl('circle', {
       r: 3 + count * 1.3,
       fill: count ? STONE.colors[sign] : '#9aa5b1',
-      stroke: '#00162a', 'stroke-width': 1,
+      stroke: '#00162a', 'stroke-width': 2,
     });
     $('pulses').append(c);
     linkEls[l.id].classList.add('active');
@@ -920,8 +933,8 @@ function setBadge(correct) {
 function resetTransient() {
   $('pulses').replaceChildren();
   Object.values(linkEls).forEach(el => el.classList.remove('active', 'changed'));
-  for (const { overlay, ring } of Object.values(nodeEls)) {
-    overlay.setAttribute('opacity', 0);
+  for (const { glow, ring } of Object.values(nodeEls)) {
+    glow.setAttribute('opacity', 0);
     ring.setAttribute('opacity', 0);
     ring.removeAttribute('stroke-dasharray');
   }
@@ -1020,7 +1033,7 @@ function miniStonesSvg(level) {
   for (let i = 0; i < STONE.max; i++) {
     const cx = 6 + i * 12;
     inner += i < count
-      ? `<path d="${STONE.shape}" fill="${STONE.colors[sign]}" stroke="#00162a" stroke-width="1" vector-effect="non-scaling-stroke" transform="translate(${cx} 0) scale(0.65)"/>`
+      ? `<path d="${STONE.shape}" fill="${STONE.colors[sign]}" stroke="#00162a" stroke-width="2" vector-effect="non-scaling-stroke" transform="translate(${cx} 0) scale(0.65)"/>`
       : `<circle cx="${cx}" cy="0" r="1.6" fill="#c8d0d9"/>`;
   }
   return `<svg class="mini-stones" width="36" height="12" viewBox="0 -6 36 12">${inner}</svg>`;
@@ -1183,7 +1196,7 @@ async function phasePresent(e, k, token) {
   await tween(DURATION.linksIn, t => {
     const p = easeInOut(t);
     inputLines.forEach(l => l.setAttribute('stroke-dashoffset', l.len * (1 - p)));
-    LAYERS.input.forEach(id => nodeEls[id].overlay.setAttribute('opacity', 0.35 * p));
+    LAYERS.input.forEach(id => nodeEls[id].glow.setAttribute('opacity', 0.7 * p));
   }, token);
 }
 
@@ -1191,13 +1204,13 @@ async function phaseForward(token) {
   setCaption('Vorwärtsdurchlauf: Die Signale laufen durch das Netz. Die Steine auf den Verbindungen bestimmen, wie stark ein Signal weitergegeben wird.');
   await animateSignals(0, token);
   await tween(DURATION.activate, t => {
-    LAYERS.hidden.forEach((id, i) => nodeEls[id].overlay.setAttribute('opacity', current.hidden[i] * 0.45 * t));
+    LAYERS.hidden.forEach((id, i) => nodeEls[id].glow.setAttribute('opacity', current.hidden[i] * 0.9 * t));
   }, token);
   await animateSignals(1, token);
   const probs = LAYERS.output.map((_, i) => i === current.pred ? current.conf : 1 - current.conf);
   await tween(DURATION.bars, t => {
     const p = easeInOut(t);
-    LAYERS.output.forEach((id, i) => nodeEls[id].overlay.setAttribute('opacity', probs[i] * 0.6 * p));
+    LAYERS.output.forEach((id, i) => nodeEls[id].glow.setAttribute('opacity', probs[i] * 0.95 * p));
     setBars(probs.map(v => v * p));
   }, token);
   setBars(probs);
@@ -1461,7 +1474,7 @@ const SHOT = {
   scale: 2,
   pad: 24,
   font: "'Segoe UI', Arial, sans-serif",
-  viewBox: { withImage: { x: -190, w: 1110 }, plain: { x: 80, w: 840 } },
+  viewBox: { withImage: { x: -190, w: 1030 }, plain: { x: 80, w: 760 } },
   tile: { minWidth: 104, gap: 10, height: 147, imageHeight: 72 },
 };
 
