@@ -102,38 +102,62 @@
   #net .img-label { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 15px; text-anchor: middle; fill: var(--text); }
   #net .stone { stroke: var(--stone-edge); stroke-width: 1; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
   #net .bar-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--text); }
+  #net .ghost { fill: none; stroke-width: 1; stroke-dasharray: 2 1.5; vector-effect: non-scaling-stroke; }
+  #net .delta-bg { fill: #fff; stroke: var(--orange); stroke-width: 1.25; }
+  #net .delta-text { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 12px; fill: var(--text); }
   #net .bar-pct { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--muted); text-anchor: end; font-variant-numeric: tabular-nums; }
 
-  /* --- Statusliste --- */
-  .status-list {
+  /* --- Kacheln der Trainingsbilder --- */
+  .tiles-head {
     display: flex;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
     gap: 8px;
-    list-style: none;
-    margin: 0 0 16px;
-    padding: 0;
+    margin: 18px 0 10px;
   }
-  .chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 10px 5px 5px;
+  .tiles-head h2 { margin: 0; }
+  .tiles-count { font-weight: bold; color: var(--blue); font-size: 15px; }
+  .tiles {
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 10px;
+  }
+  .tile {
     border: 2px solid var(--border);
     border-radius: 10px;
+    padding: 6px 8px 8px;
     background: #fff;
-    font-size: 13px;
-    transition: border-color .2s, background .2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    transition: border-color .2s, box-shadow .2s;
   }
-  .chip img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; display: block; }
-  .chip .chip-text { display: flex; flex-direction: column; line-height: 1.25; }
-  .chip .chip-sub { color: var(--muted); font-size: 12px; }
-  .chip .chip-icon { font-weight: bold; font-size: 16px; min-width: 14px; text-align: center; }
-  .chip.active { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(243, 146, 44, .2); }
-  .chip.correct { border-color: var(--ok); background: #eef8f0; }
-  .chip.correct .chip-icon { color: var(--ok); }
-  .chip.wrong { border-color: var(--bad); background: #fdeeee; }
-  .chip.wrong .chip-icon { color: var(--bad); }
-  .empty-hint { color: var(--muted); font-size: 14px; }
+  .tile-top { align-self: stretch; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); min-height: 18px; }
+  .tile-mark { font-weight: bold; font-size: 15px; }
+  .tile.active { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(243, 146, 44, .2); }
+  .tile.correct .tile-mark { color: var(--ok); }
+  .tile.wrong { border-color: var(--bad); }
+  .tile.wrong .tile-mark { color: var(--bad); }
+  .tile img { width: 100%; height: 72px; object-fit: contain; display: block; background: #fff; }
+  .tile-bar { align-self: stretch; height: 9px; border-radius: 5px; background: #edf1f5; overflow: hidden; }
+  .tile-bar-fill { height: 100%; width: 0; border-radius: 5px; border: 1px solid transparent; transition: width .3s; }
+  .tile-label {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .empty-hint { color: var(--muted); font-size: 14px; grid-column: 1 / -1; }
 
   /* --- Fortschritt --- */
   .progress-head {
@@ -220,13 +244,25 @@
   body.locked .dropzone { opacity: .45; cursor: not-allowed; }
   .input-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .input-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; }
-  .input-item img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+  .input-item img { width: 44px; height: 44px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid var(--border); }
   .input-item .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .input-item .name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .input-item select { width: 100%; padding: 3px 6px; }
   .input-item .remove { padding: 4px 9px; }
   .input-actions { display: flex; gap: 8px; margin-top: 10px; }
   .input-actions button { flex: 1; font-size: 13px; padding: 6px 8px; }
+
+  /* --- Ziel-Gewichte --- */
+  .target-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 13px; }
+  .target-table caption { text-align: left; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .target-table th { font-family: 'Courier New', monospace; font-weight: bold; padding: 2px; }
+  .target-table th.in { color: var(--orange); }
+  .target-table th.hid { color: var(--blue); }
+  .target-table th.out { color: var(--green); }
+  .target-table td { padding: 2px; text-align: center; }
+  .target-cell { display: inline-flex; align-items: center; gap: 1px; border: 1px solid var(--border); border-radius: 6px; padding: 1px; }
+  .target-cell button { padding: 0 5px; font-size: 13px; line-height: 18px; border: none; background: none; }
+  .mini-stones { display: block; }
 </style>
 </head>
 <body>
@@ -254,7 +290,7 @@
         <text x="-110" y="235" class="placeholder" id="imgPlaceholder">kein Bild</text>
         <g id="inputLinks"></g>
         <g id="imgGroup" opacity="0">
-          <image id="imgEl" x="-170" y="170" width="120" height="120" preserveAspectRatio="xMidYMid slice" clip-path="url(#imgClip)" />
+          <image id="imgEl" x="-170" y="170" width="120" height="120" preserveAspectRatio="xMidYMid meet" clip-path="url(#imgClip)" />
           <rect x="-170" y="170" width="120" height="120" rx="10" fill="none" stroke="#f3922c" stroke-width="3" />
           <text x="-110" y="318" class="img-label" id="imgLabel"></text>
           <!-- Wahrscheinlichkeitsbalken (je Label eine Zeile) -->
@@ -267,9 +303,11 @@
 
         <!-- Netz (wird per JS aus NODES/LINKS erzeugt) -->
         <g id="links"></g>
+        <g id="ghosts"></g>
         <g id="stones"></g>
         <g id="pulses"></g>
         <g id="nodes"></g>
+        <g id="deltaBadges"></g>
 
         <g class="titles">
           <text x="150" y="50" class="title-text" fill="#f3922c">Input Layer</text>
@@ -282,11 +320,11 @@
         </g>
       </svg>
 
-    </section>
-
-    <section class="card">
-      <h2>Inputs der aktuellen Epoche</h2>
-      <ul class="status-list" id="statusList"></ul>
+      <div class="tiles-head">
+        <h2>Trainingsbilder</h2>
+        <span class="tiles-count" id="tilesCount"></span>
+      </div>
+      <ul class="tiles" id="statusList"></ul>
       <div class="progress-head">
         <strong id="progressText"></strong>
         <span id="progressSub"></span>
@@ -328,6 +366,17 @@
       <div class="field">
         <label for="epochs">Anzahl Epochen (1–50)</label>
         <input type="number" id="epochs" min="1" max="50" value="10">
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Ziel-Gewichte</h2>
+      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
+      <div class="hint" style="margin: 0 0 10px">So sollen die Steine am Ende des Trainings liegen.</div>
+      <div id="targetEditor"></div>
+      <div class="input-actions">
+        <button id="targetsRandomBtn">Zufällig</button>
+        <button id="targetsZeroBtn">Alle auf 0</button>
       </div>
     </section>
 
@@ -399,6 +448,12 @@ const STONE = {
 // Wahrscheinlichkeitsbalken unter dem Trainingsbild
 const BARS = { x: -185, width: 150, y: [342, 374], height: 9 };
 
+// Klassenfarben (Label 1 / Label 2): Füllung + etwas dunklerer Rand
+const CLASS_COLORS = [
+  { fill: '#e6e6fa', edge: '#a3a3d9' },
+  { fill: '#efe9ae', edge: '#c4b955' },
+];
+
 const PHASES = [
   { key: 'present',  label: 'Bild anlegen' },
   { key: 'forward',  label: 'Vorwärtsdurchlauf' },
@@ -413,7 +468,8 @@ const DURATION = {
   signal: 650, activate: 250, bars: 500,
   predict: 600,
   evaluate: 700,
-  imageOut: 300, stonesOut: 650, stonesIn: 800, updateHold: 500,
+  imageOut: 300, badgePop: 350, stonesOut: 650, stonesIn: 800,
+  updateHoldAuto: 2000, updateHoldStep: 500, // Plaketten & Geistersteine betrachten
 };
 
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
@@ -438,7 +494,7 @@ const state = {
   results: [],          // pro Input: { status: 'pending'|'active'|'correct'|'wrong', pred }
   history: [],          // Genauigkeit pro abgeschlossener Epoche
   weights: {},          // linkId -> Gewicht in [-1, 1]
-  targets: {},          // linkId -> Zielgewicht, gegen das das Training konvergiert
+  targets: {},          // linkId -> Ziel-Stufe −3…+3 (Steine am Ende des Trainings)
 };
 
 let current = null;    // Simulationsdaten des aktuellen Bildes
@@ -502,11 +558,11 @@ function staggered(t, index, spread = 0.35) {
    ========================================================================= */
 
 function initWeights() {
-  for (const l of LINKS) {
-    state.weights[l.id] = Math.random() * 2 - 1;
-    const magnitude = 0.3 + Math.random() * 0.7;
-    state.targets[l.id] = Math.random() < 0.5 ? -magnitude : magnitude;
-  }
+  for (const l of LINKS) state.weights[l.id] = Math.random() * 2 - 1;
+}
+
+function randomTargets() {
+  for (const l of LINKS) state.targets[l.id] = Math.floor(Math.random() * (2 * STONE.max + 1)) - STONE.max;
 }
 
 function stonesFor(w) {
@@ -535,12 +591,15 @@ function simulateImage(e, k) {
   };
 }
 
-// Gewichte nähern sich dem Ziel; mehr Fehler -> stärkere (zufällige) Korrekturen
-function updateWeights(errorRate) {
+// Gewichte nähern sich dem Ziel; mehr Fehler -> stärkere (zufällige) Korrekturen.
+// Nach der letzten Epoche liegen die Steine exakt wie vorgegeben.
+function updateWeights(errorRate, isLast) {
   const lr = 1 - Math.pow(0.08, 1 / state.epochs);
   for (const l of LINKS) {
+    const target = state.targets[l.id] / STONE.max;
+    if (isLast) { state.weights[l.id] = target; continue; }
     const w = state.weights[l.id];
-    const next = w + lr * (state.targets[l.id] - w) + errorRate * 0.35 * gauss();
+    const next = w + lr * (target - w) + errorRate * 0.35 * gauss();
     state.weights[l.id] = clamp(next, -1, 1);
   }
 }
@@ -551,7 +610,7 @@ function updateWeights(errorRate) {
 
 const linkEls = {};     // linkId -> <line>
 const nodeEls = {};     // nodeId -> { overlay, ring }
-const stoneSlots = {};  // linkId -> [{ inner, path }]
+const stoneSlots = {};  // linkId -> [{ g, inner, path, box }]
 const inputLines = [];  // Linien Bild -> Input-Knoten
 const probBars = [];    // { name, value, fill } je Label
 
@@ -579,7 +638,7 @@ function buildNetwork() {
       inner.append(path);
       g.append(inner);
       stonesG.append(g);
-      stoneSlots[l.id].push({ inner, path });
+      stoneSlots[l.id].push({ g, inner, path, box: { x1: x - 9, x2: x + 9, y1: y - 9, y2: y + 9 } });
     }
   }
 
@@ -619,12 +678,16 @@ function buildNetwork() {
   });
 }
 
-function setBars(probs, highlight = null, color = '#0f3c64') {
+// Balken in Klassenfarbe; die Vorhersage bekommt einen kräftigen Rand (nach der Bewertung grün/rot)
+function setBars(probs, highlight = null, outcome = null) {
   probBars.forEach((b, i) => {
+    const hl = i === highlight;
     b.fill.setAttribute('width', (BARS.width * (probs ? probs[i] : 0)).toFixed(1));
     b.value.textContent = probs ? pct(probs[i]) : '–';
-    b.fill.setAttribute('fill', i === highlight ? color : '#9aa5b1');
-    b.name.style.fontWeight = i === highlight ? 'bold' : '';
+    b.fill.setAttribute('fill', CLASS_COLORS[i].fill);
+    b.fill.setAttribute('stroke', hl ? ({ ok: 'var(--ok)', bad: 'var(--bad)' }[outcome] || '#0f3c64') : CLASS_COLORS[i].edge);
+    b.fill.setAttribute('stroke-width', hl ? 2 : 1);
+    b.name.style.fontWeight = hl ? 'bold' : '';
   });
 }
 
@@ -646,32 +709,119 @@ function renderStonesInstant() {
   }
 }
 
-/** Animiert die Stein-Änderungen: erst wegnehmen, dann neu hinlegen. */
+const boxesOverlap = (a, b) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+
+/** Plakette „+2 🟢“ bzw. „−2 🔴 +1 🟢“; wird zentriert um (0,0) aufgebaut. */
+function createDeltaBadge(parts) {
+  const g = svgEl('g', { opacity: 0 });
+  const inner = svgEl('g');
+  const bg = svgEl('rect', { class: 'delta-bg', y: -9, height: 18, rx: 9 });
+  inner.append(bg);
+  g.append(inner);
+  $('deltaBadges').append(g); // im DOM, damit die Textbreite messbar ist
+  let x = 7;
+  parts.forEach((part, i) => {
+    if (i) x += 5;
+    const text = svgEl('text', { x, y: 4.2, class: 'delta-text' });
+    text.textContent = (part.n > 0 ? '+' : '−') + Math.abs(part.n);
+    inner.append(text);
+    x += text.getComputedTextLength() + 2;
+    inner.append(svgEl('path', {
+      d: STONE.shape, class: 'stone', fill: STONE.colors[part.sign],
+      transform: `translate(${(x + 5).toFixed(1)} 0) scale(0.65)`,
+    }));
+    x += 11;
+  });
+  x += 6;
+  bg.setAttribute('width', x.toFixed(1));
+  inner.setAttribute('transform', `translate(${(-x / 2).toFixed(1)} 0)`);
+  return { g, width: x, height: 18 };
+}
+
+/** Sucht entlang der Linie (hinter den Steinen) den ersten freien Platz für eine Plakette. */
+function placeDeltaBadge(linkId, w, h, placed) {
+  const l = LINKS.find(x => x.id === linkId);
+  const a = NODES[l.from], b = NODES[l.to];
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+  const stoneBoxes = Object.values(stoneSlots).flat().map(s => s.box);
+  const dStart = STONE.startOffset + STONE.max * STONE.spacing;
+  const boxAt = d => {
+    const cx = a.x + ux * d, cy = a.y + uy * d;
+    return { cx, cy, x1: cx - w / 2 - 2, x2: cx + w / 2 + 2, y1: cy - h / 2 - 2, y2: cy + h / 2 + 2 };
+  };
+  for (let d = dStart; d < len - NODE_R - w / 2; d += 4) {
+    const box = boxAt(d);
+    if (!placed.some(p => boxesOverlap(p, box)) && !stoneBoxes.some(sb => boxesOverlap(sb, box))) return box;
+  }
+  return boxAt(dStart);
+}
+
+function addGhost(slot, sign) {
+  const ghost = svgEl('path', {
+    d: STONE.shape, class: 'ghost', stroke: STONE.colors[sign], opacity: 0,
+    transform: slot.g.getAttribute('transform'),
+  });
+  $('ghosts').append(ghost);
+  return ghost;
+}
+
+/** Plaketten und Geistersteine der letzten Gewichtsanpassung entfernen. */
+function clearUpdateMarks() {
+  $('ghosts').replaceChildren();
+  $('deltaBadges').replaceChildren();
+}
+
+/**
+ * Animiert die Stein-Änderungen: Plakette zeigt die Änderung, weggenommene
+ * Steine bleiben als Geisterstein stehen, neue Steine werden hingelegt.
+ */
 async function animateStoneChanges(oldW, newW, token) {
-  const removals = [], additions = [], changed = [];
+  const removals = [], additions = [], changes = [];
   for (const l of LINKS) {
     const o = stonesFor(oldW[l.id]), n = stonesFor(newW[l.id]);
     const slots = stoneSlots[l.id];
     const flip = o.sign !== n.sign && o.count > 0 && n.count > 0;
     if (!flip && o.count === n.count) continue;
-    changed.push(l.id);
     if (flip) {
-      for (let i = 0; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i });
+      changes.push({ id: l.id, parts: [{ n: -o.count, sign: o.sign }, { n: n.count, sign: n.sign }] });
+      for (let i = 0; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i, sign: o.sign });
       for (let i = 0; i < n.count; i++) additions.push({ slot: slots[i], order: i, sign: n.sign });
     } else if (n.count > o.count) {
+      changes.push({ id: l.id, parts: [{ n: n.count - o.count, sign: n.sign }] });
       for (let i = o.count; i < n.count; i++) additions.push({ slot: slots[i], order: i - o.count, sign: n.sign });
     } else {
-      for (let i = n.count; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i });
+      changes.push({ id: l.id, parts: [{ n: n.count - o.count, sign: o.sign }] });
+      for (let i = n.count; i < o.count; i++) removals.push({ slot: slots[i], order: o.count - 1 - i, sign: o.sign });
     }
   }
 
-  changed.forEach(id => linkEls[id].classList.add('changed'));
+  changes.forEach(c => linkEls[c.id].classList.add('changed'));
+  const placed = [];
+  const badges = changes.map(c => {
+    const badge = createDeltaBadge(c.parts);
+    const box = placeDeltaBadge(c.id, badge.width, badge.height, placed);
+    placed.push(box);
+    return { ...badge, cx: box.cx, cy: box.cy };
+  });
+  removals.forEach(r => { r.ghost = addGhost(r.slot, r.sign); });
+
   try {
+    if (badges.length) {
+      await tween(DURATION.badgePop, t => {
+        const s = Math.max(0.01, easeOutBack(t));
+        for (const b of badges) {
+          b.g.setAttribute('opacity', clamp(t * 3));
+          b.g.setAttribute('transform', `translate(${b.cx.toFixed(1)} ${b.cy.toFixed(1)}) scale(${s.toFixed(3)})`);
+        }
+      }, token);
+    }
     if (removals.length) {
       await tween(DURATION.stonesOut, t => {
         for (const r of removals) {
           const p = easeInOut(staggered(t, r.order));
           setStoneVisual(r.slot, 1 - 0.8 * p, 1 - p, -10 * p);
+          r.ghost.setAttribute('opacity', (0.85 * p).toFixed(3));
         }
       }, token);
     }
@@ -684,11 +834,11 @@ async function animateStoneChanges(oldW, newW, token) {
         }
       }, token);
     }
-    await wait(DURATION.updateHold, token);
+    await wait(state.stepMode ? DURATION.updateHoldStep : DURATION.updateHoldAuto, token);
   } finally {
-    changed.forEach(id => linkEls[id].classList.remove('changed'));
+    changes.forEach(c => linkEls[c.id].classList.remove('changed'));
   }
-  return changed.length;
+  return changes.length;
 }
 
 /** Signale wandern entlang der Verbindungen; Farbe/Größe zeigt das Gewicht. */
@@ -776,6 +926,8 @@ const L = idx => `<strong>${escapeHtml(labelName(idx))}</strong>`;
 
 function renderStatusList() {
   const list = $('statusList');
+  const { done, correct } = epochAccuracy();
+  $('tilesCount').textContent = done ? `${correct} von ${done} richtig` : '';
   if (!state.inputs.length) {
     list.innerHTML = '<li class="empty-hint">Noch keine Trainingsbilder – rechts Bilder hinzufügen.</li>';
     return;
@@ -783,29 +935,91 @@ function renderStatusList() {
   list.replaceChildren(...state.inputs.map((inp, k) => {
     const res = state.results[k] || { status: 'pending' };
     const li = document.createElement('li');
-    li.className = `chip ${res.status}`;
+    li.className = `tile ${res.status}`;
+
+    const top = document.createElement('div');
+    top.className = 'tile-top';
+    const id = document.createElement('span');
+    id.textContent = `B${k + 1}`;
+    const mark = document.createElement('span');
+    mark.className = 'tile-mark';
+    mark.textContent = { correct: '✓', wrong: '✗' }[res.status] || '';
+    top.append(id, mark);
+
     const img = document.createElement('img');
     img.src = inp.src;
     img.alt = '';
-    const text = document.createElement('div');
-    text.className = 'chip-text';
-    const main = document.createElement('span');
-    main.textContent = labelName(inp.label);
-    const sub = document.createElement('span');
-    sub.className = 'chip-sub';
-    sub.textContent = {
-      pending: 'ausstehend',
-      active: 'wird verarbeitet …',
-      correct: 'richtig erkannt',
-      wrong: res.pred != null ? `erkannt: ${labelName(res.pred)}` : 'falsch',
-    }[res.status];
-    text.append(main, sub);
-    const icon = document.createElement('span');
-    icon.className = 'chip-icon';
-    icon.textContent = { pending: '·', active: '▸', correct: '✓', wrong: '✗' }[res.status];
-    li.append(img, text, icon);
+
+    // Balken = Vorhersage (Farbe der vorhergesagten Klasse, Länge = Sicherheit)
+    const bar = document.createElement('div');
+    bar.className = 'tile-bar';
+    const fill = document.createElement('div');
+    fill.className = 'tile-bar-fill';
+    if (res.pred != null) {
+      fill.style.width = `${res.conf * 100}%`;
+      fill.style.background = CLASS_COLORS[res.pred].fill;
+      fill.style.borderColor = CLASS_COLORS[res.pred].edge;
+      li.title = `Vorhersage: ${labelName(res.pred)} (${pct(res.conf)})`;
+    }
+    bar.append(fill);
+
+    // Plakette = echtes Label
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.textContent = labelName(inp.label);
+    label.style.background = CLASS_COLORS[inp.label].fill;
+    label.style.borderColor = CLASS_COLORS[inp.label].edge;
+
+    li.append(top, img, bar, label);
     return li;
   }));
+}
+
+function miniStonesSvg(level) {
+  const count = Math.abs(level), sign = level < 0 ? -1 : 1;
+  let inner = '';
+  for (let i = 0; i < STONE.max; i++) {
+    const cx = 6 + i * 12;
+    inner += i < count
+      ? `<path d="${STONE.shape}" fill="${STONE.colors[sign]}" stroke="#00162a" stroke-width="1" vector-effect="non-scaling-stroke" transform="translate(${cx} 0) scale(0.65)"/>`
+      : `<circle cx="${cx}" cy="0" r="1.6" fill="#c8d0d9"/>`;
+  }
+  return `<svg class="mini-stones" width="36" height="12" viewBox="0 -6 36 12">${inner}</svg>`;
+}
+
+function describeLevel(level) {
+  if (level === 0) return 'keine Steine';
+  return `${Math.abs(level)} ${level > 0 ? 'grün' : 'rot'}`;
+}
+
+// Zwei Matrizen: Input × Hidden und Hidden × Output
+function renderTargetEditor() {
+  const table = (caption, rows, cols, rowClass, colClass) => {
+    const t = document.createElement('table');
+    t.className = 'target-table';
+    t.innerHTML = `<caption>${caption}</caption><tr><th></th>${cols.map(c => `<th class="${colClass}">${c}</th>`).join('')}</tr>`;
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<th class="${rowClass}">${r}</th>`;
+      for (const c of cols) {
+        const id = `${r}-${c}`;
+        const level = state.targets[id];
+        const td = document.createElement('td');
+        td.innerHTML = `<span class="target-cell" title="${r} → ${c}: ${describeLevel(level)}">
+          <button data-link="${id}" data-delta="-1" aria-label="${r} → ${c} verringern">−</button>
+          ${miniStonesSvg(level)}
+          <button data-link="${id}" data-delta="1" aria-label="${r} → ${c} erhöhen">+</button></span>`;
+        tr.append(td);
+      }
+      t.append(tr);
+    }
+    return t;
+  };
+  $('targetEditor').replaceChildren(
+    table('Input → Hidden', LAYERS.input, LAYERS.hidden, 'in', 'hid'),
+    table('Hidden → Output', LAYERS.hidden, LAYERS.output, 'hid', 'out'),
+  );
+  renderControls();
 }
 
 function epochAccuracy() {
@@ -841,10 +1055,6 @@ function renderProgress() {
   });
 
   const parts = [];
-  if (running || state.status === 'done') {
-    const { done: d, correct } = epochAccuracy();
-    if (d) parts.push(`Diese Epoche: ${correct} von ${d} richtig (${pct(correct / d)})`);
-  }
   if (state.history.length) parts.push(`Letzte abgeschlossene Epoche: ${pct(state.history[state.history.length - 1])}`);
   $('accuracyText').textContent = parts.join(' · ');
 }
@@ -867,7 +1077,9 @@ function renderControls() {
   $('fileInput').disabled = locked;
   $('samplesBtn').disabled = locked;
   $('clearBtn').disabled = locked || !hasInputs;
-  document.querySelectorAll('#inputList select, #inputList button').forEach(el => { el.disabled = locked; });
+  $('targetsRandomBtn').disabled = locked;
+  $('targetsZeroBtn').disabled = locked;
+  document.querySelectorAll('#inputList select, #inputList button, #targetEditor button').forEach(el => { el.disabled = locked; });
 }
 
 function renderInputEditor() {
@@ -907,6 +1119,7 @@ function renderAll() {
   renderStatusList();
   renderProgress();
   renderInputEditor();
+  renderTargetEditor();
   renderControls();
 }
 
@@ -915,7 +1128,7 @@ function renderAll() {
    ========================================================================= */
 
 async function phasePresent(e, k, token) {
-  if (k === 0) resetResults();
+  if (k === 0) { resetResults(); clearUpdateMarks(); }
   resetTransient();
   current = simulateImage(e, k);
   const input = state.inputs[k];
@@ -974,8 +1187,8 @@ async function phaseEvaluate(k, token) {
     truthRing.setAttribute('stroke-dasharray', '6 5');
   }
   setBadge(correct);
-  setBars(pred === 0 ? [current.conf, 1 - current.conf] : [1 - current.conf, current.conf], pred, correct ? 'var(--ok)' : 'var(--bad)');
-  state.results[k] = { status: correct ? 'correct' : 'wrong', pred };
+  setBars(pred === 0 ? [current.conf, 1 - current.conf] : [1 - current.conf, current.conf], pred, correct ? 'ok' : 'bad');
+  state.results[k] = { status: correct ? 'correct' : 'wrong', pred, conf: current.conf };
   renderStatusList();
   renderProgress();
   setCaption(correct
@@ -998,7 +1211,7 @@ async function phaseUpdate(e, token) {
   hideImage();
 
   const oldW = { ...state.weights };
-  updateWeights(errorRate);
+  updateWeights(errorRate, e === state.epochs - 1);
   const changed = await animateStoneChanges(oldW, state.weights, token);
 
   state.completedEpochs = e + 1;
@@ -1096,6 +1309,7 @@ function resetAll() {
   state.epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
   resetResults();
   initWeights();
+  clearUpdateMarks();
   resetTransient();
   hideImage();
   renderStonesInstant();
@@ -1251,6 +1465,19 @@ function bindEvents() {
     addFiles([...e.dataTransfer.files]);
   });
 
+  $('targetEditor').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-link]');
+    if (!btn || state.status !== 'idle') return;
+    const id = btn.dataset.link;
+    state.targets[id] = clamp(state.targets[id] + Number(btn.dataset.delta), -STONE.max, STONE.max);
+    renderTargetEditor();
+  });
+  $('targetsRandomBtn').addEventListener('click', () => { randomTargets(); renderTargetEditor(); });
+  $('targetsZeroBtn').addEventListener('click', () => {
+    LINKS.forEach(l => { state.targets[l.id] = 0; });
+    renderTargetEditor();
+  });
+
   $('samplesBtn').addEventListener('click', loadSamples);
   $('clearBtn').addEventListener('click', () => { state.inputs = []; resetResults(); renderAll(); });
 
@@ -1265,6 +1492,7 @@ function init() {
   $('label0').value = state.labels[0];
   $('label1').value = state.labels[1];
   buildNetwork();
+  randomTargets(); // bleibt bei Reset erhalten
   bindEvents();
   loadSamples();
   resetAll();
