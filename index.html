@@ -390,7 +390,7 @@
       </div>
 
       <div class="field">
-        <label for="shotMode">Screenshot</label>
+        <label for="shotMode">Screenshot &amp; Video</label>
         <select id="shotMode" autocomplete="off" style="width:100%">
           <option value="plain">Netz ohne Trainingsbild</option>
           <option value="net">Netz</option>
@@ -405,6 +405,10 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
           </button>
         </div>
+        <button class="icon-btn" id="videoBtn" style="margin-top:8px">Nächsten Schritt als Video speichern
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg>
+        </button>
+        <div class="hint" id="videoHint">Video (MP4): im Schritt-Modus mit „ein Bild“ verfügbar.</div>
       </div>
     </section>
 
@@ -429,13 +433,23 @@
       </div>
     </section>
     <section class="card">
+      <h2>Start-Gewichte</h2>
+      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
+      <div class="hint" style="margin: 0 0 10px">So liegen die Steine zu Beginn des Trainings (und nach jedem Reset).</div>
+      <div id="startEditor" class="weight-editor" data-store="starts"></div>
+      <div class="input-actions">
+        <button data-store="starts" data-action="random">Zufällig</button>
+        <button data-store="starts" data-action="zero">Alle auf 0</button>
+      </div>
+    </section>
+    <section class="card">
       <h2>Ziel-Gewichte</h2>
       <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
       <div class="hint" style="margin: 0 0 10px">So sollen die Steine am Ende des Trainings liegen.</div>
-      <div id="targetEditor"></div>
+      <div id="targetEditor" class="weight-editor" data-store="targets"></div>
       <div class="input-actions">
-        <button id="targetsRandomBtn">Zufällig</button>
-        <button id="targetsZeroBtn">Alle auf 0</button>
+        <button data-store="targets" data-action="random">Zufällig</button>
+        <button data-store="targets" data-action="zero">Alle auf 0</button>
       </div>
     </section>
   </aside>
@@ -534,12 +548,15 @@ const state = {
   results: [],          // pro Input: { status: 'pending'|'active'|'correct'|'wrong', pred }
   history: [],          // Genauigkeit pro abgeschlossener Epoche
   weights: {},          // linkId -> Gewicht in [-1, 1]
+  starts: {},           // linkId -> Start-Stufe −3…+3 (Steine zu Beginn / nach Reset)
   targets: {},          // linkId -> Ziel-Stufe −3…+3 (Steine am Ende des Trainings)
 };
 
 let current = null;    // Simulationsdaten des aktuellen Bildes
 let runToken = 0;      // wird bei Reset erhöht -> laufende Animationen brechen ab
 let gateResolve = null;
+let recorder = null;   // aktive Video-Aufnahme (siehe Abschnitt 11)
+let stepEndResolve = null; // meldet der Video-Aufnahme das Ende eines Schritts
 let nextInputId = 1;
 const CANCEL = Symbol('cancel');
 
@@ -568,18 +585,24 @@ const pct = v => `${Math.round(v * 100)} %`;
 /**
  * Animations-Tween, der Geschwindigkeit und Pause berücksichtigt.
  * Bricht mit CANCEL ab, sobald ein Reset erfolgt ist.
+ * Während einer Video-Aufnahme läuft eine virtuelle Uhr: Jeder Schritt ist genau ein
+ * Videobild, das erst aufgenommen wird, bevor die Animation weiterläuft.
  */
 function tween(ms, onUpdate, token) {
   return new Promise((resolve, reject) => {
     let elapsed = 0;
     let last = performance.now();
-    const frame = now => {
+    const frame = async now => {
       if (token !== runToken) return reject(CANCEL);
       const dt = Math.min(now - last, 100);
       last = now;
-      if (state.status !== 'paused') elapsed += dt * state.speed;
+      if (recorder) elapsed += (1000 / recorder.fps) * state.speed;
+      else if (state.status !== 'paused') elapsed += dt * state.speed;
       const t = ms <= 0 ? 1 : Math.min(1, elapsed / ms);
       onUpdate(t);
+      if (recorder) {
+        try { await recorder.capture(); } catch (err) { return reject(err); }
+      }
       if (t < 1) requestAnimationFrame(frame); else resolve();
     };
     requestAnimationFrame(frame);
@@ -597,12 +620,14 @@ function staggered(t, index, spread = 0.35) {
    4. Simulation (keine echte Berechnung – nur plausibles Verhalten)
    ========================================================================= */
 
+// Gewichte auf die festgelegten Start-Gewichte setzen
 function initWeights() {
-  for (const l of LINKS) state.weights[l.id] = Math.random() * 2 - 1;
+  for (const l of LINKS) state.weights[l.id] = state.starts[l.id] / STONE.max;
 }
 
-function randomTargets() {
-  for (const l of LINKS) state.targets[l.id] = Math.floor(Math.random() * (2 * STONE.max + 1)) - STONE.max;
+// Zufällige Stufen für state.starts bzw. state.targets
+function randomLevels(store) {
+  for (const l of LINKS) state[store][l.id] = Math.floor(Math.random() * (2 * STONE.max + 1)) - STONE.max;
 }
 
 function stonesFor(w) {
@@ -1044,8 +1069,15 @@ function describeLevel(level) {
   return `${Math.abs(level)} ${level > 0 ? 'grün' : 'rot'}`;
 }
 
-// Zwei Matrizen: Input × Hidden und Hidden × Output
-function renderTargetEditor() {
+// Je Editor zwei Matrizen: Input × Hidden und Hidden × Output
+const WEIGHT_EDITORS = { starts: 'startEditor', targets: 'targetEditor' };
+
+function renderWeightEditors() {
+  for (const [store, containerId] of Object.entries(WEIGHT_EDITORS)) renderWeightEditor(store, containerId);
+  renderControls();
+}
+
+function renderWeightEditor(store, containerId) {
   const table = (caption, rows, cols, rowClass, colClass) => {
     const t = document.createElement('table');
     t.className = 'target-table';
@@ -1055,7 +1087,7 @@ function renderTargetEditor() {
       tr.innerHTML = `<th class="${rowClass}">${r}</th>`;
       for (const c of cols) {
         const id = `${r}-${c}`;
-        const level = state.targets[id];
+        const level = state[store][id];
         const td = document.createElement('td');
         td.innerHTML = `<span class="target-cell" title="${r} → ${c}: ${describeLevel(level)}">
           <button data-link="${id}" data-delta="-1" aria-label="${r} → ${c} verringern">−</button>
@@ -1067,11 +1099,10 @@ function renderTargetEditor() {
     }
     return t;
   };
-  $('targetEditor').replaceChildren(
+  $(containerId).replaceChildren(
     table('Input → Hidden', LAYERS.input, LAYERS.hidden, 'in', 'hid'),
     table('Hidden → Output', LAYERS.hidden, LAYERS.output, 'hid', 'out'),
   );
-  renderControls();
 }
 
 function epochAccuracy() {
@@ -1129,9 +1160,17 @@ function renderControls() {
   $('fileInput').disabled = locked;
   $('samplesBtn').disabled = locked;
   $('clearBtn').disabled = locked || !hasInputs;
-  $('targetsRandomBtn').disabled = locked;
-  $('targetsZeroBtn').disabled = locked;
-  document.querySelectorAll('#inputList select, #inputList button, #targetEditor button').forEach(el => { el.disabled = locked; });
+  document.querySelectorAll('#inputList select, #inputList button, .weight-editor button, button[data-store]').forEach(el => { el.disabled = locked; });
+
+  const videoReady = state.stepMode && state.granularity === 'image' && (s === 'idle' || s === 'stepwait') && hasInputs;
+  $('videoBtn').disabled = !videoReady || !!recorder;
+  $('videoHint').style.display = videoReady || recorder ? 'none' : '';
+  if (recorder) {
+    $('stepBtn').disabled = true;
+    $('resetBtn').disabled = true;
+  } else {
+    $('resetBtn').disabled = false;
+  }
 }
 
 function renderInputEditor() {
@@ -1171,8 +1210,7 @@ function renderAll() {
   renderStatusList();
   renderProgress();
   renderInputEditor();
-  renderTargetEditor();
-  renderControls();
+  renderWeightEditors();
 }
 
 /* =========================================================================
@@ -1283,6 +1321,7 @@ function isBoundary(kind) {
 // Wartet im Schritt-Modus auf „Weiter“
 async function gate(token) {
   setStatus('stepwait');
+  notifyStepEnd();
   await new Promise(resolve => { gateResolve = resolve; });
   gateResolve = null;
   if (token !== runToken) throw CANCEL;
@@ -1314,6 +1353,7 @@ async function runTraining(token) {
     finishTraining();
   } catch (err) {
     if (err !== CANCEL) console.error(err);
+    notifyStepEnd();
   }
 }
 
@@ -1343,9 +1383,14 @@ function startTraining() {
   runTraining(++runToken);
 }
 
+function notifyStepEnd() {
+  if (stepEndResolve) { stepEndResolve(); stepEndResolve = null; }
+}
+
 function finishTraining() {
   state.phase = null;
   setStatus('done');
+  notifyStepEnd();
   renderPhaseBar();
   const last = state.history[state.history.length - 1];
   setCaption(`Training abgeschlossen: ${state.epochs} Epochen, Genauigkeit in der letzten Epoche <strong>${pct(last)}</strong>. Mit Reset startest du neu.`);
@@ -1546,7 +1591,7 @@ async function drawTiles(ctx, x0, y0, innerW) {
   ctx.fillText($('tilesCount').textContent, x0 + innerW, y0 + 14);
   let y = y0 + 28;
 
-  const images = await Promise.all(state.inputs.map(inp => loadImage(inp.src)));
+  const images = await Promise.all(state.inputs.map(inp => loadCachedImage(inp.src)));
   state.inputs.forEach((inp, k) => {
     const res = state.results[k] || { status: 'pending' };
     const tx = x0 + (k % layout.cols) * (layout.width + gap);
@@ -1624,40 +1669,62 @@ function drawProgress(ctx, x0, y0, innerW) {
   return 64;
 }
 
+const imageCache = new Map();
+function loadCachedImage(src) {
+  if (!imageCache.has(src)) imageCache.set(src, loadImage(src));
+  return imageCache.get(src);
+}
+
 async function createScreenshot(mode) {
+  const canvas = await createScreenshotCanvas(mode, SHOT.scale);
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+// Größe des Screenshots in CSS-Pixeln (ohne Skalierung)
+function screenshotSize(mode) {
+  const vb = mode !== 'plain' ? SHOT.viewBox.withImage : SHOT.viewBox.plain;
+  const W = vb.w, innerW = W - 2 * SHOT.pad;
+  let H = 400 + SHOT.pad;
+  if (mode === 'tiles' || mode === 'full') H += 28 + tileLayout(innerW).rows * (SHOT.tile.height + SHOT.tile.gap) + 8;
+  if (mode === 'full') H += 64;
+  return { W, H };
+}
+
+async function createScreenshotCanvas(mode, scale, target = null) {
   const withImage = mode !== 'plain';
   const vb = withImage ? SHOT.viewBox.withImage : SHOT.viewBox.plain;
   const W = vb.w, netH = 400, pad = SHOT.pad, innerW = W - 2 * pad;
   const withTiles = mode === 'tiles' || mode === 'full';
   const withProgress = mode === 'full';
 
-  let H = netH + pad;
-  if (withTiles) H += 28 + tileLayout(innerW).rows * (SHOT.tile.height + SHOT.tile.gap) + 8;
-  if (withProgress) H += 64;
+  const { H } = screenshotSize(mode);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = W * SHOT.scale;
-  canvas.height = H * SHOT.scale;
+  const canvas = target || document.createElement('canvas');
+  if (!target) {
+    canvas.width = Math.round(W * scale);
+    canvas.height = Math.round(H * scale);
+  }
   const ctx = canvas.getContext('2d');
-  ctx.scale(SHOT.scale, SHOT.scale);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, canvas.width, canvas.height); // ganze Fläche, auch Rundungspixel beim Video
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.drawImage(await loadImage(netSvgDataUrl(vb, withImage)), 0, 0, W, netH);
 
   let y = netH;
   if (withTiles) y += await drawTiles(ctx, pad, y, innerW) + 8;
   if (withProgress) drawProgress(ctx, pad, y, innerW);
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  return canvas;
 }
 
 let toastTimer = null;
-function showToast(message, isError = false) {
+function showToast(message, isError = false, sticky = false) {
   const t = $('toast');
   t.textContent = message;
   t.classList.toggle('error', isError);
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 4000 : 2200);
+  if (!sticky) toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 4000 : 2200);
 }
 
 async function saveScreenshot() {
@@ -1688,7 +1755,174 @@ async function copyScreenshot() {
 }
 
 /* =========================================================================
-   11. Events & Start
+   11. Video (MP4/H.264 über WebCodecs, eigener kleiner MP4-Muxer)
+   ========================================================================= */
+
+const VIDEO = {
+  fps: 30,
+  maxWidth: 1920,       // Breite höchstens Full HD
+  bitrate: 8_000_000,
+  holdSeconds: 1,       // Endbild am Schluss kurz stehen lassen
+  codecs: ['avc1.640033', 'avc1.4d0033', 'avc1.42003e', 'avc1.42001f'],
+};
+
+// --- MP4-Container (ftyp + mdat + moov, eine Videospur) ---
+const mp4 = {
+  u8: v => [v & 255],
+  u16: v => [(v >> 8) & 255, v & 255],
+  u32: v => [(v >>> 24) & 255, (v >> 16) & 255, (v >> 8) & 255, v & 255],
+  str: s => [...s].map(c => c.charCodeAt(0)),
+  box(type, ...parts) {
+    const body = parts.flat(Infinity);
+    return [...mp4.u32(body.length + 8), ...mp4.str(type), ...body];
+  },
+  full: (type, version, flags, ...parts) => mp4.box(type, mp4.u8(version), mp4.u32(flags).slice(1), ...parts),
+  matrix: () => [0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x40000000].flatMap(v => mp4.u32(v)),
+};
+
+function buildMp4({ width, height, fps, samples, avcC }) {
+  const { box, full, u16, u32, str, matrix } = mp4;
+  const timescale = fps * 100, delta = 100, duration = samples.length * delta;
+  const ftyp = box('ftyp', str('isom'), u32(512), str('isom'), str('iso2'), str('avc1'), str('mp41'));
+  const mdatSize = 8 + samples.reduce((n, s) => n + s.data.length, 0);
+  const dataOffset = ftyp.length + 8;
+
+  const avc1 = box('avc1',
+    new Array(6).fill(0), u16(1),                // reserved, data_reference_index
+    u16(0), u16(0), new Array(12).fill(0),       // pre_defined, reserved
+    u16(width), u16(height),
+    u32(0x00480000), u32(0x00480000), u32(0), u16(1),
+    new Array(32).fill(0), u16(0x18), u16(0xffff),
+    box('avcC', [...avcC]));
+  const stbl = box('stbl',
+    full('stsd', 0, 0, u32(1), avc1),
+    full('stts', 0, 0, u32(1), u32(samples.length), u32(delta)),
+    full('stss', 0, 0, u32(samples.filter(s => s.key).length), samples.flatMap((s, i) => s.key ? u32(i + 1) : [])),
+    full('stsc', 0, 0, u32(1), u32(1), u32(samples.length), u32(1)),
+    full('stsz', 0, 0, u32(0), u32(samples.length), samples.flatMap(s => u32(s.data.length))),
+    full('stco', 0, 0, u32(1), u32(dataOffset)));
+  const moov = box('moov',
+    full('mvhd', 0, 0, u32(0), u32(0), u32(timescale), u32(duration), u32(0x00010000), u16(0x0100),
+      new Array(10).fill(0), matrix(), new Array(24).fill(0), u32(2)),
+    box('trak',
+      full('tkhd', 0, 3, u32(0), u32(0), u32(1), u32(0), u32(duration), new Array(8).fill(0),
+        u16(0), u16(0), u16(0), u16(0), matrix(), u32(width << 16), u32(height << 16)),
+      box('mdia',
+        full('mdhd', 0, 0, u32(0), u32(0), u32(timescale), u32(duration), u16(0x55c4), u16(0)),
+        full('hdlr', 0, 0, u32(0), str('vide'), new Array(12).fill(0), str('VideoHandler'), [0]),
+        box('minf',
+          full('vmhd', 0, 1, u16(0), u16(0), u16(0), u16(0)),
+          box('dinf', full('dref', 0, 0, u32(1), full('url ', 0, 1))),
+          stbl))));
+  return new Blob([
+    new Uint8Array(ftyp),
+    new Uint8Array([...u32(mdatSize), ...str('mdat')]),
+    ...samples.map(s => s.data),
+    new Uint8Array(moov),
+  ], { type: 'video/mp4' });
+}
+
+async function createRecorder(mode) {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
+    throw new Error('Dieser Browser kann keine Videos erzeugen (WebCodecs fehlt).');
+  }
+  const { W, H } = screenshotSize(mode);
+  const scale = Math.min(2, VIDEO.maxWidth / W);
+  const even = v => Math.ceil(v / 2) * 2; // H.264 braucht gerade Maße
+  const width = even(W * scale), height = even(H * scale);
+
+  let config = null;
+  for (const codec of VIDEO.codecs) {
+    const candidate = { codec, width, height, bitrate: VIDEO.bitrate, framerate: VIDEO.fps, avc: { format: 'avc' } };
+    if ((await VideoEncoder.isConfigSupported(candidate)).supported) { config = candidate; break; }
+  }
+  if (!config) throw new Error('Dieser Browser kann kein MP4 (H.264) erzeugen.');
+
+  const samples = [];
+  let avcC = null, encodeError = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => {
+      if (meta?.decoderConfig?.description) avcC = new Uint8Array(meta.decoderConfig.description);
+      const data = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(data);
+      samples.push({ data, key: chunk.type === 'key' });
+    },
+    error: err => { encodeError = err; },
+  });
+  encoder.configure(config);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  let index = 0;
+
+  return {
+    fps: VIDEO.fps,
+    async capture() {
+      if (encodeError) throw encodeError;
+      await createScreenshotCanvas(mode, scale, canvas);
+      const frame = new VideoFrame(canvas, { timestamp: Math.round(index * 1e6 / VIDEO.fps), duration: Math.round(1e6 / VIDEO.fps) });
+      encoder.encode(frame, { keyFrame: index % (VIDEO.fps * 2) === 0 });
+      frame.close();
+      index++;
+      if (index % 15 === 0) showToast(`Video wird aufgenommen … ${(index / VIDEO.fps).toFixed(1)} s`, false, true);
+      while (encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 5));
+    },
+    async finish() {
+      await encoder.flush();
+      encoder.close();
+      if (encodeError) throw encodeError;
+      if (!avcC) throw new Error('Kein Video-Header erzeugt.');
+      return buildMp4({ width, height, fps: VIDEO.fps, samples, avcC });
+    },
+    abort() { try { encoder.close(); } catch {} },
+  };
+}
+
+/** Führt im Schritt-Modus („ein Bild“) den nächsten Schritt aus und speichert ihn als MP4. */
+async function recordNextStepVideo() {
+  if (recorder || !state.stepMode || state.granularity !== 'image') return;
+  if (!(state.status === 'idle' || state.status === 'stepwait') || !state.inputs.length) return;
+  const mode = $('shotMode').value;
+  const willUpdate = state.status === 'stepwait' && state.phase === 'evaluate' && state.results.every(r => r.status !== 'pending');
+  const name = willUpdate
+    ? `netz_epoche-${state.epoch + 1}_gewichte.mp4`
+    : `netz_epoche-${state.status === 'idle' ? 1 : state.epoch + 1 + (state.phase === 'update' ? 1 : 0)}_bild-${state.status === 'idle' || state.phase === 'update' ? 1 : state.results.filter(r => r.status !== 'pending').length + 1}.mp4`;
+  try {
+    recorder = await createRecorder(mode);
+  } catch (err) {
+    recorder = null;
+    showToast(err.message, true);
+    return;
+  }
+  renderControls();
+  showToast('Video wird aufgenommen …', false, true);
+  try {
+    await recorder.capture(); // Ausgangszustand
+    const stepDone = new Promise(resolve => { stepEndResolve = resolve; });
+    nextStep();
+    await stepDone;
+    for (let i = 0; i < VIDEO.fps * VIDEO.holdSeconds; i++) await recorder.capture();
+    showToast('Video wird erstellt …', false, true);
+    const blob = await recorder.finish();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    showToast('Video gespeichert – in PowerPoint per Drag & Drop oder „Einfügen → Video“ einfügen.');
+  } catch (err) {
+    console.error(err);
+    recorder?.abort();
+    showToast('Video konnte nicht erstellt werden.', true);
+  } finally {
+    recorder = null;
+    renderControls();
+  }
+}
+
+/* =========================================================================
+   12. Events & Start
    ========================================================================= */
 
 function bindEvents() {
@@ -1711,7 +1945,7 @@ function bindEvents() {
   });
 
   document.querySelectorAll('input[name=gran]').forEach(r =>
-    r.addEventListener('change', () => { state.granularity = r.value; }));
+    r.addEventListener('change', () => { state.granularity = r.value; renderControls(); }));
 
   $('epochs').addEventListener('change', () => {
     state.epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
@@ -1742,18 +1976,30 @@ function bindEvents() {
     addFiles([...e.dataTransfer.files]);
   });
 
-  $('targetEditor').addEventListener('click', e => {
+  // Start- und Ziel-Gewichte; Start-Gewichte sind sofort im Netz sichtbar
+  const weightsChanged = store => {
+    if (store === 'starts') {
+      initWeights();
+      clearUpdateMarks();
+      renderStonesInstant();
+    }
+    renderWeightEditors();
+  };
+  document.querySelectorAll('.weight-editor').forEach(editor => editor.addEventListener('click', e => {
     const btn = e.target.closest('button[data-link]');
     if (!btn || state.status !== 'idle') return;
-    const id = btn.dataset.link;
-    state.targets[id] = clamp(state.targets[id] + Number(btn.dataset.delta), -STONE.max, STONE.max);
-    renderTargetEditor();
-  });
-  $('targetsRandomBtn').addEventListener('click', () => { randomTargets(); renderTargetEditor(); });
-  $('targetsZeroBtn').addEventListener('click', () => {
-    LINKS.forEach(l => { state.targets[l.id] = 0; });
-    renderTargetEditor();
-  });
+    const store = editor.dataset.store, id = btn.dataset.link;
+    state[store][id] = clamp(state[store][id] + Number(btn.dataset.delta), -STONE.max, STONE.max);
+    weightsChanged(store);
+  }));
+  document.querySelectorAll('button[data-store]').forEach(btn => btn.addEventListener('click', () => {
+    if (state.status !== 'idle') return;
+    const store = btn.dataset.store;
+    if (btn.dataset.action === 'random') randomLevels(store);
+    else LINKS.forEach(l => { state[store][l.id] = 0; });
+    weightsChanged(store);
+  }));
+  $('videoBtn').addEventListener('click', recordNextStepVideo);
 
   $('samplesBtn').addEventListener('click', loadSamples);
   $('clearBtn').addEventListener('click', () => { state.inputs = []; resetResults(); renderAll(); });
@@ -1777,7 +2023,8 @@ function init() {
   $('label0').value = state.labels[0];
   $('label1').value = state.labels[1];
   buildNetwork();
-  randomTargets(); // bleibt bei Reset erhalten
+  randomLevels('starts');  // bleiben bei Reset erhalten
+  randomLevels('targets');
   bindEvents();
   loadSamples();
   resetAll();
