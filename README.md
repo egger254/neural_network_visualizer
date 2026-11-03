@@ -16,9 +16,11 @@ Interaktive, **rein simulierte** Visualisierung, wie ein kleines neuronales Netz
 - **Ablauf pro Bild:** Bild anlegen → Vorwärtsdurchlauf → Vorhersage → Bewertung (richtig/falsch). Die simulierte Trefferquote steigt über die Epochen von ca. 40 % auf ca. 95 %.
 - **Wahrscheinlichkeitsbalken** unter dem Trainingsbild zeigen die Ausgabe des Netzes je Label; Vorhersage hervorgehoben, nach der Bewertung grün (richtig) bzw. rot (falsch).
 - **Kacheln & Fortschritt** (unter dem Netz): je Bild Nummer, ✓/✗, Vorhersage-Balken (Klassenfarbe, Länge = Sicherheit) und Plakette mit echtem Label; Zurücksetzen pro Epoche. Klassenfarben: Lavender / #EFE9AE. Bilder werden immer vollständig (nicht beschnitten) angezeigt.
-- **Steuerung:** Start/Pause/Reset, Geschwindigkeit 0,25×–4×, 1–50 Epochen, Schritt-Modus mit wählbarer Schrittgröße (Phase / Bild / Epoche). Tastatur: Leertaste, →.
+- **Steuerung:** Start/Pause/Reset, Geschwindigkeit 0,25×–4×, 1–50 Epochen, Schritt-Modus mit wählbarer Schrittgröße (Phase / Bild / Epoche). Tastatur: Leertaste, →, ←.
 - **Screenshot** (Steuerung): Netz ohne Trainingsbild / Netz / Netz mit Trainingsbildern / Netz mit Trainingsbildern und Fortschrittsbalken – als PNG speichern oder in die Zwischenablage kopieren.
 - **Video** (Schritt-Modus, „ein Bild“): nächsten Schritt als MP4 (H.264, 30 fps, bis Full HD) speichern – Bild für Bild berechnet, daher ruckelfrei. Kopieren von Videos erlauben Browser nicht.
+- **Gesamtes Training als Video:** alle Epochen ohne Schritt-Pausen als ein MP4; Reset bricht die Aufnahme ab.
+- **Schritt zurück** (Schritt-Modus, Button „Zurück“ oder ←): Das Training wird mit demselben Zufalls-Startwert ohne Animation bis zum vorherigen Haltepunkt vorgespult – identische Ergebnisse wie vorher.
 - Während des Trainings sind Labels, Bilder und Ziel-Gewichte gesperrt; Reset entsperrt.
 
 ## Code-Aufbau (`index.html`)

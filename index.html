@@ -110,9 +110,9 @@
   /* --- Kacheln der Trainingsbilder --- */
   .tiles-head {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: baseline;
-    gap: 8px;
+    gap: 12px;
     margin: 18px 0 10px;
   }
   .tiles-head h2 { margin: 0; }
@@ -121,11 +121,13 @@
     list-style: none;
     margin: 0 0 18px;
     padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* auch die letzte Reihe mittig */
     gap: 10px;
   }
   .tile {
+    width: 116px;
     border: 2px solid var(--border);
     border-radius: 10px;
     padding: 6px 8px 8px;
@@ -157,7 +159,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .empty-hint { color: var(--muted); font-size: 14px; grid-column: 1 / -1; }
+  .empty-hint { color: var(--muted); font-size: 14px; flex-basis: 100%; text-align: center; }
 
   /* --- Fortschritt --- */
   .progress-head {
@@ -361,6 +363,7 @@
       <h2>Steuerung</h2>
       <div class="btn-row">
         <button class="primary" id="playBtn"></button>
+        <button id="backBtn" title="Schritt zurück (←)">⏮ Zurück</button>
         <button id="stepBtn" title="Nächster Schritt (→)">⏭ Weiter</button>
         <button id="resetBtn">↺ Reset</button>
       </div>
@@ -381,7 +384,7 @@
           <label><input type="radio" name="gran" autocomplete="off" value="image" checked>ein Bild</label>
           <label><input type="radio" name="gran" autocomplete="off" value="epoch">eine Epoche</label>
         </div>
-        <div class="hint">Tastatur: Leertaste = Start/Pause, → = Weiter</div>
+        <div class="hint">Tastatur: Leertaste = Start/Pause, → = Weiter, ← = Zurück</div>
       </div>
 
       <div class="field">
@@ -408,7 +411,10 @@
         <button class="icon-btn" id="videoBtn" style="margin-top:8px">Nächsten Schritt als Video speichern
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg>
         </button>
-        <div class="hint" id="videoHint">Video (MP4): im Schritt-Modus mit „ein Bild“ verfügbar.</div>
+        <div class="hint" id="videoHint">Schritt-Video: im Schritt-Modus mit „ein Bild“ verfügbar.</div>
+        <button class="icon-btn" id="videoAllBtn" style="margin-top:8px">Gesamtes Training als Video speichern
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg>
+        </button>
       </div>
     </section>
 
@@ -548,6 +554,8 @@ const state = {
   results: [],          // pro Input: { status: 'pending'|'active'|'correct'|'wrong', pred }
   history: [],          // Genauigkeit pro abgeschlossener Epoche
   weights: {},          // linkId -> Gewicht in [-1, 1]
+  seed: 1,              // Zufalls-Startwert des Trainingslaufs
+  positions: [],        // durchlaufene Schritt-Haltepunkte („e:k:phase“) für „Zurück“
   starts: {},           // linkId -> Start-Stufe −3…+3 (Steine zu Beginn / nach Reset)
   targets: {},          // linkId -> Ziel-Stufe −3…+3 (Steine am Ende des Trainings)
 };
@@ -556,6 +564,8 @@ let current = null;    // Simulationsdaten des aktuellen Bildes
 let runToken = 0;      // wird bei Reset erhöht -> laufende Animationen brechen ab
 let gateResolve = null;
 let recorder = null;   // aktive Video-Aufnahme (siehe Abschnitt 11)
+let recordingAll = false; // gesamtes Training wird aufgenommen -> keine Schritt-Pausen
+let fastForward = null;   // { target } beim Zurückspringen: ohne Animation bis zur Position laufen
 let stepEndResolve = null; // meldet der Video-Aufnahme das Ende eines Schritts
 let nextInputId = 1;
 const CANCEL = Symbol('cancel');
@@ -575,8 +585,19 @@ const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const easeOutBack = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+// Reproduzierbarer Zufall pro Trainingslauf (nötig für „Schritt zurück“)
+function mulberry32(seed) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rng = Math.random;
+
 function gauss() {
-  const u = 1 - Math.random(), v = Math.random();
+  const u = 1 - rng(), v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 const labelName = idx => state.labels[idx];
@@ -589,6 +610,11 @@ const pct = v => `${Math.round(v * 100)} %`;
  * Videobild, das erst aufgenommen wird, bevor die Animation weiterläuft.
  */
 function tween(ms, onUpdate, token) {
+  if (fastForward) {
+    if (token !== runToken) return Promise.reject(CANCEL);
+    onUpdate(1);
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     let elapsed = 0;
     let last = performance.now();
@@ -645,14 +671,14 @@ function accuracyForEpoch(e) {
 
 function simulateImage(e, k) {
   const input = state.inputs[k];
-  const correct = Math.random() < accuracyForEpoch(e);
-  const conf = clamp(0.55 + Math.random() * 0.15 + 0.25 * epochProgress(e), 0, 0.98);
+  const correct = rng() < accuracyForEpoch(e);
+  const conf = clamp(0.55 + rng() * 0.15 + 0.25 * epochProgress(e), 0, 0.98);
   return {
     k,
     correct,
     pred: correct ? input.label : 1 - input.label,
     conf,
-    hidden: LAYERS.hidden.map(() => 0.2 + Math.random() * 0.8),
+    hidden: LAYERS.hidden.map(() => 0.2 + rng() * 0.8),
   };
 }
 
@@ -1164,13 +1190,14 @@ function renderControls() {
 
   const videoReady = state.stepMode && state.granularity === 'image' && (s === 'idle' || s === 'stepwait') && hasInputs;
   $('videoBtn').disabled = !videoReady || !!recorder;
+  $('videoAllBtn').disabled = s !== 'idle' || !hasInputs || !!recorder;
   $('videoHint').style.display = videoReady || recorder ? 'none' : '';
+  $('backBtn').disabled = !state.stepMode || !['stepwait', 'done'].includes(s) || !!recorder;
   if (recorder) {
     $('stepBtn').disabled = true;
-    $('resetBtn').disabled = true;
-  } else {
-    $('resetBtn').disabled = false;
+    $('playBtn').disabled = true;
   }
+  $('resetBtn').title = recorder ? 'Bricht die Video-Aufnahme ab' : '';
 }
 
 function renderInputEditor() {
@@ -1319,7 +1346,8 @@ function isBoundary(kind) {
 }
 
 // Wartet im Schritt-Modus auf „Weiter“
-async function gate(token) {
+async function gate(token, pos, restoring = false) {
+  if (!restoring) state.positions.push(pos);
   setStatus('stepwait');
   notifyStepEnd();
   await new Promise(resolve => { gateResolve = resolve; });
@@ -1329,12 +1357,17 @@ async function gate(token) {
 }
 function releaseGate() { if (gateResolve) gateResolve(); }
 
-async function step(kind, fn, token, isLast = false) {
+async function step(kind, fn, token, pos, isLast = false) {
   state.phase = kind;
   renderPhaseBar();
   await fn();
   if (token !== runToken) throw CANCEL;
-  if (state.stepMode && !isLast && isBoundary(kind)) await gate(token);
+  if (fastForward) {
+    // beim Zurückspringen: an der Zielposition anhalten
+    if (pos === fastForward.target) { fastForward = null; await gate(token, pos, true); }
+    return;
+  }
+  if (state.stepMode && !recordingAll && !isLast && isBoundary(kind)) await gate(token, pos);
 }
 
 async function runTraining(token) {
@@ -1343,12 +1376,12 @@ async function runTraining(token) {
     for (let e = 0; e < state.epochs; e++) {
       state.epoch = e;
       for (let k = 0; k < n; k++) {
-        await step('present', () => phasePresent(e, k, token), token);
-        await step('forward', () => phaseForward(token), token);
-        await step('predict', () => phasePredict(token), token);
-        await step('evaluate', () => phaseEvaluate(k, token), token);
+        await step('present', () => phasePresent(e, k, token), token, `${e}:${k}:present`);
+        await step('forward', () => phaseForward(token), token, `${e}:${k}:forward`);
+        await step('predict', () => phasePredict(token), token, `${e}:${k}:predict`);
+        await step('evaluate', () => phaseEvaluate(k, token), token, `${e}:${k}:evaluate`);
       }
-      await step('update', () => phaseUpdate(e, token), token, e === state.epochs - 1);
+      await step('update', () => phaseUpdate(e, token), token, `${e}:u:update`, e === state.epochs - 1);
     }
     finishTraining();
   } catch (err) {
@@ -1378,6 +1411,8 @@ function startTraining() {
   state.completedEpochs = 0;
   state.history = [];
   state.epoch = 0;
+  if (!fastForward) state.positions = [];
+  rng = mulberry32(state.seed);
   resetResults();
   setStatus('running');
   runTraining(++runToken);
@@ -1396,9 +1431,14 @@ function finishTraining() {
   setCaption(`Training abgeschlossen: ${state.epochs} Epochen, Genauigkeit in der letzten Epoche <strong>${pct(last)}</strong>. Mit Reset startest du neu.`);
 }
 
-function resetAll() {
+function resetAll(keepSeed = false) {
   runToken++;
+  fastForward = null;
+  if (recorder) recorder.aborted = true; // laufende Video-Aufnahme abbrechen
   releaseGate();
+  notifyStepEnd();
+  if (!keepSeed) state.seed = (Math.random() * 2 ** 31) | 0;
+  state.positions = [];
   current = null;
   state.status = 'idle';
   state.phase = null;
@@ -1427,6 +1467,20 @@ function nextStep() {
   if (!state.stepMode) return;
   if (state.status === 'idle') startTraining();
   else if (state.status === 'stepwait') releaseGate();
+}
+
+/**
+ * Schritt zurück: Training mit demselben Zufalls-Startwert neu starten und ohne
+ * Animation bis zum vorherigen Haltepunkt vorspulen (gleiche Ergebnisse wie vorher).
+ */
+function stepBack() {
+  if (!state.stepMode || recorder || !['stepwait', 'done'].includes(state.status)) return;
+  const positions = state.status === 'done' ? state.positions.slice() : state.positions.slice(0, -1);
+  resetAll(true);
+  if (!positions.length) return; // zurück zum Anfang
+  state.positions = positions;
+  fastForward = { target: positions[positions.length - 1] };
+  startTraining();
 }
 
 /* =========================================================================
@@ -1520,7 +1574,7 @@ const SHOT = {
   pad: 24,
   font: "'Segoe UI', Arial, sans-serif",
   viewBox: { withImage: { x: -190, w: 1030 }, plain: { x: 80, w: 760 } },
-  tile: { minWidth: 104, gap: 10, height: 147, imageHeight: 72 },
+  tile: { width: 116, gap: 10, height: 147, imageHeight: 72 },
 };
 
 function loadImage(src) {
@@ -1569,9 +1623,9 @@ function fitText(ctx, text, maxWidth) {
 }
 
 function tileLayout(innerW) {
-  const { minWidth, gap } = SHOT.tile;
-  const cols = Math.max(1, Math.floor((innerW + gap) / (minWidth + gap)));
-  return { cols, width: (innerW - gap * (cols - 1)) / cols, rows: Math.ceil(state.inputs.length / cols) };
+  const { width, gap } = SHOT.tile;
+  const cols = Math.max(1, Math.floor((innerW + gap) / (width + gap)));
+  return { cols, width, rows: Math.ceil(state.inputs.length / cols) };
 }
 
 async function drawTiles(ctx, x0, y0, innerW) {
@@ -1580,21 +1634,33 @@ async function drawTiles(ctx, x0, y0, innerW) {
   const { gap, height, imageHeight } = SHOT.tile;
   const layout = tileLayout(innerW);
 
+  // Überschrift und Zähler mittig über den Kacheln
   ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  const title = 'TRAININGSBILDER', count = $('tilesCount').textContent;
+  ctx.font = `bold 13px ${SHOT.font}`;
+  const titleW = ctx.measureText(title).width;
+  ctx.font = `bold 15px ${SHOT.font}`;
+  const countW = count ? ctx.measureText(count).width + 12 : 0;
+  const hx = x0 + (innerW - titleW - countW) / 2;
   ctx.font = `bold 13px ${SHOT.font}`;
   ctx.fillStyle = color('--muted');
-  ctx.textAlign = 'left';
-  ctx.fillText('TRAININGSBILDER', x0, y0 + 14);
-  ctx.font = `bold 15px ${SHOT.font}`;
-  ctx.fillStyle = color('--blue');
-  ctx.textAlign = 'right';
-  ctx.fillText($('tilesCount').textContent, x0 + innerW, y0 + 14);
+  ctx.fillText(title, hx, y0 + 14);
+  if (count) {
+    ctx.font = `bold 15px ${SHOT.font}`;
+    ctx.fillStyle = color('--blue');
+    ctx.fillText(count, hx + titleW + 12, y0 + 14);
+  }
   let y = y0 + 28;
 
   const images = await Promise.all(state.inputs.map(inp => loadCachedImage(inp.src)));
   state.inputs.forEach((inp, k) => {
     const res = state.results[k] || { status: 'pending' };
-    const tx = x0 + (k % layout.cols) * (layout.width + gap);
+    // jede Reihe (auch die letzte) mittig
+    const row = Math.floor(k / layout.cols);
+    const inRow = Math.min(layout.cols, state.inputs.length - row * layout.cols);
+    const rowX = x0 + (innerW - (inRow * layout.width + (inRow - 1) * gap)) / 2;
+    const tx = rowX + (k % layout.cols) * (layout.width + gap);
     const ty = y + Math.floor(k / layout.cols) * (height + gap);
     const tw = layout.width;
     const border = { wrong: color('--bad'), active: color('--orange') }[res.status] || color('--border');
@@ -1854,18 +1920,23 @@ async function createRecorder(mode) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  let index = 0;
+  let index = 0, closed = false;
 
   return {
     fps: VIDEO.fps,
     async capture() {
+      if (this.aborted || closed) throw CANCEL; // nach Abbruch/Reset nichts mehr aufnehmen
       if (encodeError) throw encodeError;
       await createScreenshotCanvas(mode, scale, canvas);
+      if (this.aborted || closed) throw CANCEL; // Abbruch während des Zeichnens
       const frame = new VideoFrame(canvas, { timestamp: Math.round(index * 1e6 / VIDEO.fps), duration: Math.round(1e6 / VIDEO.fps) });
       encoder.encode(frame, { keyFrame: index % (VIDEO.fps * 2) === 0 });
       frame.close();
       index++;
-      if (index % 15 === 0) showToast(`Video wird aufgenommen … ${(index / VIDEO.fps).toFixed(1)} s`, false, true);
+      if (index % 15 === 0) {
+        const where = recordingAll ? ` · Epoche ${state.epoch + 1} von ${state.epochs}` : '';
+        showToast(`Video wird aufgenommen … ${(index / VIDEO.fps).toFixed(1)} s${where} (Reset bricht ab)`, false, true);
+      }
       while (encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 5));
     },
     async finish() {
@@ -1875,36 +1946,33 @@ async function createRecorder(mode) {
       if (!avcC) throw new Error('Kein Video-Header erzeugt.');
       return buildMp4({ width, height, fps: VIDEO.fps, samples, avcC });
     },
-    abort() { try { encoder.close(); } catch {} },
+    abort() { closed = true; try { encoder.close(); } catch {} },
   };
 }
 
-/** Führt im Schritt-Modus („ein Bild“) den nächsten Schritt aus und speichert ihn als MP4. */
-async function recordNextStepVideo() {
-  if (recorder || !state.stepMode || state.granularity !== 'image') return;
-  if (!(state.status === 'idle' || state.status === 'stepwait') || !state.inputs.length) return;
+/** Nimmt auf, bis `start()` fertig ist (Schritt-Ende oder Trainings-Ende), und lädt das MP4 herunter. */
+async function recordVideo(name, start, all = false) {
   const mode = $('shotMode').value;
-  const willUpdate = state.status === 'stepwait' && state.phase === 'evaluate' && state.results.every(r => r.status !== 'pending');
-  const name = willUpdate
-    ? `netz_epoche-${state.epoch + 1}_gewichte.mp4`
-    : `netz_epoche-${state.status === 'idle' ? 1 : state.epoch + 1 + (state.phase === 'update' ? 1 : 0)}_bild-${state.status === 'idle' || state.phase === 'update' ? 1 : state.results.filter(r => r.status !== 'pending').length + 1}.mp4`;
+  let rec;
   try {
-    recorder = await createRecorder(mode);
+    rec = recorder = await createRecorder(mode);
   } catch (err) {
     recorder = null;
     showToast(err.message, true);
     return;
   }
+  recordingAll = all;
   renderControls();
   showToast('Video wird aufgenommen …', false, true);
   try {
-    await recorder.capture(); // Ausgangszustand
-    const stepDone = new Promise(resolve => { stepEndResolve = resolve; });
-    nextStep();
-    await stepDone;
-    for (let i = 0; i < VIDEO.fps * VIDEO.holdSeconds; i++) await recorder.capture();
+    await rec.capture(); // Ausgangszustand
+    const done = new Promise(resolve => { stepEndResolve = resolve; });
+    start();
+    await done;
+    if (rec.aborted) { rec.abort(); showToast('Video-Aufnahme abgebrochen.'); return; }
+    for (let i = 0; i < VIDEO.fps * VIDEO.holdSeconds; i++) await rec.capture();
     showToast('Video wird erstellt …', false, true);
-    const blob = await recorder.finish();
+    const blob = await rec.finish();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -1912,13 +1980,33 @@ async function recordNextStepVideo() {
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     showToast('Video gespeichert – in PowerPoint per Drag & Drop oder „Einfügen → Video“ einfügen.');
   } catch (err) {
+    rec.abort();
+    if (rec.aborted || err === CANCEL) { showToast('Video-Aufnahme abgebrochen.'); return; }
     console.error(err);
-    recorder?.abort();
     showToast('Video konnte nicht erstellt werden.', true);
   } finally {
     recorder = null;
+    recordingAll = false;
     renderControls();
   }
+}
+
+/** Führt im Schritt-Modus („ein Bild“) den nächsten Schritt aus und speichert ihn als MP4. */
+function recordNextStepVideo() {
+  if (recorder || !state.stepMode || state.granularity !== 'image') return;
+  if (!(state.status === 'idle' || state.status === 'stepwait') || !state.inputs.length) return;
+  const willUpdate = state.status === 'stepwait' && state.phase === 'evaluate' && state.results.every(r => r.status !== 'pending');
+  const nextEpoch = state.status === 'idle' ? 1 : state.epoch + 1 + (state.phase === 'update' ? 1 : 0);
+  const nextImage = state.status === 'idle' || state.phase === 'update' ? 1 : state.results.filter(r => r.status !== 'pending').length + 1;
+  const name = willUpdate ? `netz_epoche-${state.epoch + 1}_gewichte.mp4` : `netz_epoche-${nextEpoch}_bild-${nextImage}.mp4`;
+  return recordVideo(name, nextStep);
+}
+
+/** Nimmt das gesamte Training (alle Epochen, ohne Schritt-Pausen) als ein MP4 auf. */
+function recordFullTrainingVideo() {
+  if (recorder || state.status !== 'idle' || !state.inputs.length) return;
+  const epochs = clamp(Math.round(Number($('epochs').value) || 10), 1, 50);
+  return recordVideo(`netz_training_${epochs}-epochen.mp4`, startTraining, true);
 }
 
 /* =========================================================================
@@ -1928,7 +2016,8 @@ async function recordNextStepVideo() {
 function bindEvents() {
   $('playBtn').addEventListener('click', togglePlay);
   $('stepBtn').addEventListener('click', nextStep);
-  $('resetBtn').addEventListener('click', resetAll);
+  $('backBtn').addEventListener('click', stepBack);
+  $('resetBtn').addEventListener('click', () => resetAll());
   $('shotSaveBtn').addEventListener('click', saveScreenshot);
   $('shotCopyBtn').addEventListener('click', copyScreenshot);
 
@@ -2000,6 +2089,7 @@ function bindEvents() {
     weightsChanged(store);
   }));
   $('videoBtn').addEventListener('click', recordNextStepVideo);
+  $('videoAllBtn').addEventListener('click', recordFullTrainingVideo);
 
   $('samplesBtn').addEventListener('click', loadSamples);
   $('clearBtn').addEventListener('click', () => { state.inputs = []; resetResults(); renderAll(); });
@@ -2008,6 +2098,7 @@ function bindEvents() {
     if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(document.activeElement?.tagName)) return;
     if (e.code === 'Space') { e.preventDefault(); state.stepMode ? nextStep() : togglePlay(); }
     if (e.code === 'ArrowRight') { e.preventDefault(); nextStep(); }
+    if (e.code === 'ArrowLeft') { e.preventDefault(); stepBack(); }
   });
 }
 
