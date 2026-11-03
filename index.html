@@ -100,7 +100,7 @@
   #net .class-text.predicted { fill: var(--blue); text-decoration: underline; }
   #net .placeholder { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; fill: var(--muted); text-anchor: middle; }
   #net .img-label { font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 15px; text-anchor: middle; fill: var(--text); }
-  #net .stone { stroke: var(--stone-edge); stroke-width: 2; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
+  #net .stone { stroke: var(--stone-edge); stroke-width: 1.5; stroke-miterlimit: 8; fill-rule: evenodd; vector-effect: non-scaling-stroke; }
   #net .bar-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; fill: var(--text); }
   #net .ghost { fill: none; stroke-width: 1; stroke-dasharray: 2 1.5; vector-effect: non-scaling-stroke; }
   #net .delta-bg { fill: #fff; stroke: var(--orange); stroke-width: 1.25; }
@@ -901,7 +901,7 @@ async function animateSignals(stage, token) {
     const c = svgEl('circle', {
       r: 3 + count * 1.3,
       fill: count ? STONE.colors[sign] : '#9aa5b1',
-      stroke: '#00162a', 'stroke-width': 2,
+      stroke: '#00162a', 'stroke-width': 1.5,
     });
     $('pulses').append(c);
     linkEls[l.id].classList.add('active');
@@ -1033,7 +1033,7 @@ function miniStonesSvg(level) {
   for (let i = 0; i < STONE.max; i++) {
     const cx = 6 + i * 12;
     inner += i < count
-      ? `<path d="${STONE.shape}" fill="${STONE.colors[sign]}" stroke="#00162a" stroke-width="2" vector-effect="non-scaling-stroke" transform="translate(${cx} 0) scale(0.65)"/>`
+      ? `<path d="${STONE.shape}" fill="${STONE.colors[sign]}" stroke="#00162a" stroke-width="1.5" vector-effect="non-scaling-stroke" transform="translate(${cx} 0) scale(0.65)"/>`
       : `<circle cx="${cx}" cy="0" r="1.6" fill="#c8d0d9"/>`;
   }
   return `<svg class="mini-stones" width="36" height="12" viewBox="0 -6 36 12">${inner}</svg>`;
