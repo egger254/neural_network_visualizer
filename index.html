@@ -252,6 +252,24 @@
   .input-actions { display: flex; gap: 8px; margin-top: 10px; }
   .input-actions button { flex: 1; font-size: 13px; padding: 6px 8px; }
 
+  .icon-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 20px);
+    background: var(--text);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { background: var(--bad); }
+
   /* --- Ziel-Gewichte --- */
   .target-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 13px; }
   .target-table caption { text-align: left; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
@@ -285,6 +303,7 @@
         </defs>
 
         <!-- Bereich für das aktuelle Trainingsbild -->
+        <g id="imageArea">
         <text x="-110" y="50" class="title-text" fill="#6b7785">Trainingsbild</text>
         <rect x="-170" y="170" width="120" height="120" rx="10" fill="#fff" stroke="#f3922c" stroke-width="2" stroke-dasharray="6 5" />
         <text x="-110" y="235" class="placeholder" id="imgPlaceholder">kein Bild</text>
@@ -299,6 +318,7 @@
         <g id="badge" opacity="0">
           <circle cx="-54" cy="174" r="18" id="badgeCircle" />
           <path id="badgeIcon" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
         </g>
 
         <!-- Netz (wird per JS aus NODES/LINKS erzeugt) -->
@@ -347,44 +367,51 @@
       <div class="field">
         <label for="speed">Geschwindigkeit</label>
         <div class="field-inline">
-          <input type="range" id="speed" min="0" max="7" step="1" value="3">
+          <input type="range" id="speed" min="0" max="7" step="1" value="3" autocomplete="off">
           <span class="speed-value" id="speedValue"></span>
         </div>
       </div>
 
       <div class="field">
-        <label class="toggle"><input type="checkbox" id="stepMode"> Schritt-Modus</label>
+        <label class="toggle"><input type="checkbox" id="stepMode" autocomplete="off"> Schritt-Modus</label>
         <div class="field-label" style="margin-top:8px">Ein Schritt ist …</div>
         <div class="segmented" id="granularity">
-          <label><input type="radio" name="gran" value="phase">eine Phase</label>
-          <label><input type="radio" name="gran" value="image" checked>ein Bild</label>
-          <label><input type="radio" name="gran" value="epoch">eine Epoche</label>
+          <label><input type="radio" name="gran" autocomplete="off" value="phase">eine Phase</label>
+          <label><input type="radio" name="gran" autocomplete="off" value="image" checked>ein Bild</label>
+          <label><input type="radio" name="gran" autocomplete="off" value="epoch">eine Epoche</label>
         </div>
         <div class="hint">Tastatur: Leertaste = Start/Pause, → = Weiter</div>
       </div>
 
       <div class="field">
         <label for="epochs">Anzahl Epochen (1–50)</label>
-        <input type="number" id="epochs" min="1" max="50" value="10">
+        <input type="number" id="epochs" min="1" max="50" value="10" autocomplete="off">
       </div>
-    </section>
 
-    <section class="card">
-      <h2>Ziel-Gewichte</h2>
-      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
-      <div class="hint" style="margin: 0 0 10px">So sollen die Steine am Ende des Trainings liegen.</div>
-      <div id="targetEditor"></div>
-      <div class="input-actions">
-        <button id="targetsRandomBtn">Zufällig</button>
-        <button id="targetsZeroBtn">Alle auf 0</button>
+      <div class="field">
+        <label for="shotMode">Screenshot</label>
+        <select id="shotMode" autocomplete="off" style="width:100%">
+          <option value="plain">Netz ohne Trainingsbild</option>
+          <option value="net">Netz</option>
+          <option value="tiles">Netz mit Trainingsbildern</option>
+          <option value="full" selected>Netz mit Trainingsbildern und Fortschrittsbalken</option>
+        </select>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="icon-btn" id="shotSaveBtn">Speichern
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+          </button>
+          <button class="icon-btn" id="shotCopyBtn">Kopieren
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+          </button>
+        </div>
       </div>
     </section>
 
     <section class="card">
       <h2>Labels</h2>
       <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
-      <div class="label-row"><span>o1</span><input type="text" id="label0" maxlength="16"></div>
-      <div class="label-row"><span>o2</span><input type="text" id="label1" maxlength="16"></div>
+      <div class="label-row"><span>o1</span><input type="text" id="label0" maxlength="16" autocomplete="off"></div>
+      <div class="label-row"><span>o2</span><input type="text" id="label1" maxlength="16" autocomplete="off"></div>
     </section>
 
     <section class="card">
@@ -400,8 +427,20 @@
         <button id="clearBtn">Alle entfernen</button>
       </div>
     </section>
+    <section class="card">
+      <h2>Ziel-Gewichte</h2>
+      <div class="lock-note">🔒 Während des Trainings gesperrt – zum Bearbeiten Reset drücken.</div>
+      <div class="hint" style="margin: 0 0 10px">So sollen die Steine am Ende des Trainings liegen.</div>
+      <div id="targetEditor"></div>
+      <div class="input-actions">
+        <button id="targetsRandomBtn">Zufällig</button>
+        <button id="targetsZeroBtn">Alle auf 0</button>
+      </div>
+    </section>
   </aside>
 </div>
+
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 /* =========================================================================
@@ -1221,6 +1260,8 @@ async function phaseUpdate(e, token) {
 }
 
 function isBoundary(kind) {
+  // direkt aus der Oberfläche lesen, damit Anzeige und Verhalten nie auseinanderlaufen
+  state.granularity = document.querySelector('input[name=gran]:checked')?.value || state.granularity;
   if (state.granularity === 'phase') return true;
   if (state.granularity === 'image') return kind === 'evaluate' || kind === 'update';
   return kind === 'update';
@@ -1413,13 +1454,236 @@ function loadSamples() {
 }
 
 /* =========================================================================
-   10. Events & Start
+   10. Screenshot (ohne externe Bibliothek: Netz-SVG als Bild, Rest per Canvas)
+   ========================================================================= */
+
+const SHOT = {
+  scale: 2,
+  pad: 24,
+  font: "'Segoe UI', Arial, sans-serif",
+  viewBox: { withImage: { x: -190, w: 1110 }, plain: { x: 80, w: 840 } },
+  tile: { minWidth: 104, gap: 10, height: 147, imageHeight: 72 },
+};
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// Netz-SVG eigenständig machen: CSS-Regeln und CSS-Variablen auflösen
+function netSvgDataUrl(vb, withImage) {
+  const vars = getComputedStyle(document.documentElement);
+  const resolve = str => str.replace(/var\((--[\w-]+)\)/g, (_, name) => vars.getPropertyValue(name).trim());
+  const clone = $('net').cloneNode(true);
+  clone.setAttribute('viewBox', `${vb.x} 0 ${vb.w} 400`);
+  clone.setAttribute('width', vb.w);
+  clone.setAttribute('height', 400);
+  if (!withImage) clone.querySelector('#imageArea').remove();
+  clone.querySelectorAll('*').forEach(el => {
+    for (const attr of [...el.attributes]) if (attr.value.includes('var(')) el.setAttribute(attr.name, resolve(attr.value));
+  });
+  const css = [...document.styleSheets]
+    .flatMap(sheet => { try { return [...sheet.cssRules]; } catch { return []; } })
+    .filter(rule => rule.selectorText?.startsWith('#net '))
+    .map(rule => resolve(rule.cssText))
+    .join('\n');
+  const style = svgEl('style');
+  style.textContent = css;
+  clone.prepend(style);
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke, lineWidth = 1) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineWidth; ctx.stroke(); }
+}
+
+function fitText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  while (text.length > 1 && ctx.measureText(text + '…').width > maxWidth) text = text.slice(0, -1);
+  return text + '…';
+}
+
+function tileLayout(innerW) {
+  const { minWidth, gap } = SHOT.tile;
+  const cols = Math.max(1, Math.floor((innerW + gap) / (minWidth + gap)));
+  return { cols, width: (innerW - gap * (cols - 1)) / cols, rows: Math.ceil(state.inputs.length / cols) };
+}
+
+async function drawTiles(ctx, x0, y0, innerW) {
+  const css = getComputedStyle(document.documentElement);
+  const color = name => css.getPropertyValue(name).trim();
+  const { gap, height, imageHeight } = SHOT.tile;
+  const layout = tileLayout(innerW);
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold 13px ${SHOT.font}`;
+  ctx.fillStyle = color('--muted');
+  ctx.textAlign = 'left';
+  ctx.fillText('TRAININGSBILDER', x0, y0 + 14);
+  ctx.font = `bold 15px ${SHOT.font}`;
+  ctx.fillStyle = color('--blue');
+  ctx.textAlign = 'right';
+  ctx.fillText($('tilesCount').textContent, x0 + innerW, y0 + 14);
+  let y = y0 + 28;
+
+  const images = await Promise.all(state.inputs.map(inp => loadImage(inp.src)));
+  state.inputs.forEach((inp, k) => {
+    const res = state.results[k] || { status: 'pending' };
+    const tx = x0 + (k % layout.cols) * (layout.width + gap);
+    const ty = y + Math.floor(k / layout.cols) * (height + gap);
+    const tw = layout.width;
+    const border = { wrong: color('--bad'), active: color('--orange') }[res.status] || color('--border');
+    roundRect(ctx, tx + 1, ty + 1, tw - 2, height - 2, 10, '#fff', border, 2);
+
+    ctx.font = `12px ${SHOT.font}`;
+    ctx.fillStyle = color('--muted');
+    ctx.textAlign = 'left';
+    ctx.fillText(`B${k + 1}`, tx + 9, ty + 19);
+    const mark = { correct: '✓', wrong: '✗' }[res.status];
+    if (mark) {
+      ctx.font = `bold 15px ${SHOT.font}`;
+      ctx.fillStyle = res.status === 'correct' ? color('--ok') : color('--bad');
+      ctx.textAlign = 'right';
+      ctx.fillText(mark, tx + tw - 9, ty + 20);
+    }
+
+    // Bild vollständig einpassen
+    const iw = tw - 16, ix = tx + 8, iy = ty + 27;
+    const img = images[k];
+    const s = Math.min(iw / img.width, imageHeight / img.height);
+    ctx.drawImage(img, ix + (iw - img.width * s) / 2, iy + (imageHeight - img.height * s) / 2, img.width * s, img.height * s);
+
+    const by = iy + imageHeight + 6;
+    roundRect(ctx, ix, by, iw, 9, 4.5, '#edf1f5');
+    if (res.pred != null) roundRect(ctx, ix + 0.5, by + 0.5, Math.max(9, iw * res.conf) - 1, 8, 4, CLASS_COLORS[res.pred].fill, CLASS_COLORS[res.pred].edge);
+
+    ctx.font = `600 12px ${SHOT.font}`;
+    const label = fitText(ctx, labelName(inp.label), iw - 20);
+    const pw = Math.min(iw, ctx.measureText(label).width + 20);
+    const py = by + 15;
+    roundRect(ctx, tx + (tw - pw) / 2, py, pw, 20, 10, CLASS_COLORS[inp.label].fill, CLASS_COLORS[inp.label].edge);
+    ctx.fillStyle = color('--text');
+    ctx.textAlign = 'center';
+    ctx.fillText(label, tx + tw / 2, py + 14);
+  });
+  return 28 + layout.rows * (height + gap);
+}
+
+function drawProgress(ctx, x0, y0, innerW) {
+  const css = getComputedStyle(document.documentElement);
+  const color = name => css.getPropertyValue(name).trim();
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold 14px ${SHOT.font}`;
+  ctx.fillStyle = color('--text');
+  ctx.textAlign = 'left';
+  ctx.fillText($('progressText').textContent, x0, y0 + 14);
+  ctx.font = `14px ${SHOT.font}`;
+  ctx.textAlign = 'right';
+  ctx.fillText($('progressSub').textContent, x0 + innerW, y0 + 14);
+
+  const segs = [...$('segments').children];
+  const gap = 3, sw = (innerW - gap * (segs.length - 1)) / segs.length, sy = y0 + 22;
+  segs.forEach((seg, i) => {
+    const sx = x0 + i * (sw + gap);
+    roundRect(ctx, sx, sy, sw, 16, 3, '#e3e8ee');
+    const frac = seg.firstChild.getBoundingClientRect().width / seg.getBoundingClientRect().width;
+    if (frac > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(sx, sy, sw, 16, 3);
+      ctx.clip();
+      ctx.fillStyle = color('--blue');
+      ctx.fillRect(sx, sy, sw * frac, 16);
+      ctx.restore();
+    }
+  });
+  ctx.font = `14px ${SHOT.font}`;
+  ctx.fillStyle = color('--muted');
+  ctx.textAlign = 'left';
+  ctx.fillText($('accuracyText').textContent, x0, sy + 36);
+  return 64;
+}
+
+async function createScreenshot(mode) {
+  const withImage = mode !== 'plain';
+  const vb = withImage ? SHOT.viewBox.withImage : SHOT.viewBox.plain;
+  const W = vb.w, netH = 400, pad = SHOT.pad, innerW = W - 2 * pad;
+  const withTiles = mode === 'tiles' || mode === 'full';
+  const withProgress = mode === 'full';
+
+  let H = netH + pad;
+  if (withTiles) H += 28 + tileLayout(innerW).rows * (SHOT.tile.height + SHOT.tile.gap) + 8;
+  if (withProgress) H += 64;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SHOT.scale;
+  canvas.height = H * SHOT.scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SHOT.scale, SHOT.scale);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(await loadImage(netSvgDataUrl(vb, withImage)), 0, 0, W, netH);
+
+  let y = netH;
+  if (withTiles) y += await drawTiles(ctx, pad, y, innerW) + 8;
+  if (withProgress) drawProgress(ctx, pad, y, innerW);
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+let toastTimer = null;
+function showToast(message, isError = false) {
+  const t = $('toast');
+  t.textContent = message;
+  t.classList.toggle('error', isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 4000 : 2200);
+}
+
+async function saveScreenshot() {
+  try {
+    const blob = await createScreenshot($('shotMode').value);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `netz_epoche-${state.completedEpochs}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    showToast('Screenshot gespeichert.');
+  } catch (err) {
+    console.error(err);
+    showToast('Screenshot konnte nicht erstellt werden.', true);
+  }
+}
+
+async function copyScreenshot() {
+  try {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Zwischenablage nicht verfügbar');
+    const blob = await createScreenshot($('shotMode').value);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showToast('Screenshot in die Zwischenablage kopiert.');
+  } catch (err) {
+    console.warn(err);
+    showToast('Kopieren wird von diesem Browser nicht unterstützt – bitte „Speichern“ verwenden.', true);
+  }
+}
+
+/* =========================================================================
+   11. Events & Start
    ========================================================================= */
 
 function bindEvents() {
   $('playBtn').addEventListener('click', togglePlay);
   $('stepBtn').addEventListener('click', nextStep);
   $('resetBtn').addEventListener('click', resetAll);
+  $('shotSaveBtn').addEventListener('click', saveScreenshot);
+  $('shotCopyBtn').addEventListener('click', copyScreenshot);
 
   $('speed').addEventListener('input', e => {
     state.speed = SPEEDS[Number(e.target.value)];
@@ -1488,7 +1752,15 @@ function bindEvents() {
   });
 }
 
+// Werte aus der Oberfläche übernehmen (Browser können alte Formularwerte wiederherstellen)
+function syncControlsFromDom() {
+  state.stepMode = $('stepMode').checked;
+  state.speed = SPEEDS[Number($('speed').value)] ?? 1;
+  state.granularity = document.querySelector('input[name=gran]:checked')?.value || 'image';
+}
+
 function init() {
+  syncControlsFromDom();
   $('label0').value = state.labels[0];
   $('label1').value = state.labels[1];
   buildNetwork();
@@ -1499,6 +1771,7 @@ function init() {
 }
 
 init();
+window.addEventListener('pageshow', () => { syncControlsFromDom(); renderControls(); });
 </script>
 </body>
 </html>

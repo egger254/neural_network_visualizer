@@ -16,7 +16,8 @@ Interaktive, **rein simulierte** Visualisierung, wie ein kleines neuronales Netz
 - **Wahrscheinlichkeitsbalken** unter dem Trainingsbild zeigen die Ausgabe des Netzes je Label; Vorhersage hervorgehoben, nach der Bewertung grün (richtig) bzw. rot (falsch).
 - **Kacheln & Fortschritt** (unter dem Netz): je Bild Nummer, ✓/✗, Vorhersage-Balken (Klassenfarbe, Länge = Sicherheit) und Plakette mit echtem Label; Zurücksetzen pro Epoche. Klassenfarben: Lavender / #EFE9AE. Bilder werden immer vollständig (nicht beschnitten) angezeigt.
 - **Steuerung:** Start/Pause/Reset, Geschwindigkeit 0,25×–4×, 1–50 Epochen, Schritt-Modus mit wählbarer Schrittgröße (Phase / Bild / Epoche). Tastatur: Leertaste, →.
-- Während des Trainings sind Labels und Bilder gesperrt; Reset entsperrt.
+- **Screenshot** (Steuerung): Netz ohne Trainingsbild / Netz / Netz mit Trainingsbildern / Netz mit Trainingsbildern und Fortschrittsbalken – als PNG speichern oder in die Zwischenablage kopieren.
+- Während des Trainings sind Labels, Bilder und Ziel-Gewichte gesperrt; Reset entsperrt.
 
 ## Code-Aufbau (`index.html`)
 
@@ -31,4 +32,5 @@ Das Script ist in nummerierte Abschnitte gegliedert:
 7. **Trainingsablauf** – Phasen-Funktionen und `runTraining()`
 8. **Steuerung** – Start, Pause, Schritt, Reset
 9. **Inputs** – Upload und Beispielbilder
-10. **Events & Start**
+10. **Screenshot** – Netz-SVG als Bild, Kacheln/Fortschritt per Canvas
+11. **Events & Start**
